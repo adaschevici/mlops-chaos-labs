@@ -22,7 +22,7 @@ up:
 
 chaos-test:
 	docker ps -q --filter "name=lab01-connection-pool-celery-worker" |  \
-		xargs -I {} docker exec {} python chaos_scenario.py $(SCENARIO)
+		xargs -I {} -P 0 docker exec {} python chaos_scenario.py $(SCENARIO)
 
 down:
 	docker compose down --volumes --remove-orphans

@@ -3,9 +3,9 @@ result_backend = 'redis://redis:6379/0'
 
 
 # THE REAL PROBLEM: Pool too small + high concurrency
-broker_pool_limit = 1  # ← Even smaller!
+broker_pool_limit = 10  # ← Even smaller!
 result_backend_transport_options = {
-    'max_connections': 1  # ← Only 1 connection for results!
+    'max_connections': 10  # ← Only 1 connection for results!
 }
 
 # Make it worse
