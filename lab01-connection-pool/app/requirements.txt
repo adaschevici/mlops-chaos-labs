@@ -1,0 +1,10 @@
+# Core dependencies
+celery==5.5.3
+redis==7.0.1
+
+# Monitoring
+prometheus_client==0.23.1
+flower==2.0.1
+
+# Utilities
+click==8.3.1

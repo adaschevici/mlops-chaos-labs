@@ -10,9 +10,9 @@ def print_header(title):
     echo(f" {title}")
     echo("=" * 70 + "\n")
 
-def scenario_1_sudden_spike():
+def scenario_1_sudden_spike(num_tasks=250):
     """50 tasks at once - will exhaust connection pool"""
-    print_header("SCENARIO 1: Sudden Spike (50 concurrent tasks)")
+    print_header(f"SCENARIO 1: Sudden Spike ({num_tasks} concurrent tasks)")
     
     echo("📊 Expected behavior with broken config:")
     echo("  ❌ Connection timeouts")
@@ -25,12 +25,12 @@ def scenario_1_sudden_spike():
     echo("  ✅ Even load distribution\n")
     
     echo(f"⏰ Starting at: {datetime.now().strftime('%H:%M:%S')}")
-    echo("🚀 Submitting 50 tasks...\n")
+    echo(f"🚀 Submitting {num_tasks} tasks...\n")
     
     # Create and submit task group
     job = group(
-        simulate_work.s(task_id=i, duration=100) 
-        for i in range(50)
+        simulate_work.s(task_id=i, duration=2) 
+        for i in range(num_tasks)
     )
     
     start = time.time()
@@ -61,7 +61,7 @@ def scenario_1_sudden_spike():
                 if ready_count != completed:
                     completed = ready_count
                     elapsed = time.time() - start
-                    echo(f"  Progress: {completed}/50 tasks ({completed/50*100:.0f}%) - {elapsed:.1f}s elapsed")
+                    echo(f"  Progress: {completed}/{num_tasks} tasks ({completed/num_tasks*100:.0f}%) - {elapsed:.1f}s elapsed")
             except:
                 pass
             time.sleep(2)
@@ -71,12 +71,12 @@ def scenario_1_sudden_spike():
             result.get(timeout=5)
             duration = time.time() - start
             echo(f"\n✅ SUCCESS: All tasks completed in {duration:.1f}s")
-            echo(f"   Average: {duration/50:.2f}s per task")
+            echo(f"   Average: {duration/num_tasks:.2f}s per task")
         else:
             duration = time.time() - start
             echo(f"\n⏱️  TIMEOUT: Not all tasks completed in {duration:.1f}s")
             completed = sum(1 for r in result.results if r.ready())
-            echo(f"   Completed: {completed}/50 tasks ({completed/50*100:.0f}%)")
+            echo(f"   Completed: {completed}/50 tasks ({completed/num_tasks*100:.0f}%)")
             
     except Exception as e:
         duration = time.time() - start
@@ -134,7 +134,7 @@ def scenario_2_sustained_load():
         echo("   Run diagnostics: docker exec lab01-celery-worker python diagnose.py")
 
 @command(help="Run test scenarios for Celery with Redis backend")
-@argument('scenario', default='1', type=Choice('1', '2']), required=False)
+@argument('scenario', default='1', type=Choice(['1', '2']), required=False)
 def cli(scenario):
     """
     Runs one of two defined test scenarios.
