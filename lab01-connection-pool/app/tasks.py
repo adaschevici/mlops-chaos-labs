@@ -27,18 +27,18 @@ def task_with_extra_connections(self, task_id, operations=10):
         for i in range(operations):
             r = get_redis()  # ← Each opens a NEW connection!
             connections.append(r)
-            
+
             # Do work that holds the connection
             r.set(f"task:{task_id}:step:{i}", json.dumps({
                 'status': 'processing',
                 'timestamp': time.time()
             }))
-            
-            time.sleep(0.5)  # Simulate work while holding connection
-            
+            time.sleep(0.5)
+
+        time.sleep(random.uniform(1, 50))  # Simulate work while holding connection
         print(f"Task {task_id} completed {operations} operations")
         return {"task_id": task_id, "operations": operations}
-        
+
     except redis.exceptions.ConnectionError as e:
         print(f"Task {task_id} FAILED: Connection error - {e}")
         raise

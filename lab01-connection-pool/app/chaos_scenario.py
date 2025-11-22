@@ -9,28 +9,57 @@ from celery import group
 import time
 import sys
 from datetime import datetime
+import socket
+
+def get_container_id_via_hostname():
+    """Retrieves the container ID, which is set as the hostname."""
+    try:
+        # Get the hostname, which is the full container ID inside Docker
+        hostname = socket.gethostname()
+        return hostname
+    except Exception as e:
+        return f"Error reading hostname: {e}"
 
 def print_header(title):
     echo("\n" + "=" * 70)
     echo(f" {title}")
     echo("=" * 70 + "\n")
 
-def scenario_1_connection_explosion(num_tasks=1800):
+def get_task_states(result):
     """
-    Each task opens 10 connections
-    With 3 workers × 8 concurrency = 24 tasks
-    24 tasks × 10 connections = 240 connections needed
-    But pool only has 1 connection!
+    Safely get task states with error handling
+    Returns: (ready, successful, failed, pending, error_msgs)
     """
-    print_header("SCENARIO 1: Connection Explosion")
+    ready = 0
+    successful = 0
+    failed = 0
+    error_msgs = []
     
-    echo("📊 Setup:")
-    echo("  Workers: 3")
-    echo("  Concurrency per worker: 8")
-    echo("  Total concurrent tasks: 24")
-    echo("  Connections per task: 10")
-    echo("  Total connections needed: 240")
-    echo("  Pool size: 1 ← THIS WILL BREAK!\n")
+    total = len(result.results)
+    
+    for idx, r in enumerate(result.results):
+        try:
+            if r.ready():
+                ready += 1
+                try:
+                    if r.successful():
+                        successful += 1
+                    elif r.failed():
+                        failed += 1
+                except Exception as e:
+                    # Task in weird state
+                    error_msgs.append(f"Task {idx}: {type(e).__name__}")
+        except Exception as e:
+            # Can't even check if ready
+            error_msgs.append(f"Task {idx} check failed: {e}")
+    
+    pending = total - ready
+    
+    return ready, successful, failed, pending, error_msgs
+
+def scenario_1_connection_explosion(num_tasks=1800):
+    """Version with robust error handling"""
+    print_header("SCENARIO 1: Connection Explosion")
     
     echo(f"🚀 Submitting {num_tasks} tasks...\n")
     
@@ -42,49 +71,81 @@ def scenario_1_connection_explosion(num_tasks=1800):
     start = time.time()
     result = job.apply_async()
     
-    echo("⏳ Watch it fail in real-time...")
-    echo("\n🔍 Monitor with:")
-    echo("  watch -n 1 'docker exec lab01-redis redis-cli INFO clients'")
-    echo("  docker-compose logs -f celery-worker-1\n")
+    echo("⏳ Monitoring...\n")
     
-    # Monitor
-    completed = 0
-    errors = 0
-    timeout = 120
+    timeout = 60 * 10
+    poll_start = time.time()
+    last_ready = 0
+    stall_count = 0
+    container_id =  get_container_id_via_hostname()
     
     try:
-        poll_start = time.time()
-        while not result.ready() and (time.time() - poll_start) < timeout:
-            ready_count = sum(1 for r in result.results if r.ready())
-            failed_count = sum(1 for r in result.results if r.failed())
+        while (time.time() - poll_start) < timeout:
+            elapsed = time.time() - start
             
-            if ready_count != completed or failed_count != errors:
-                completed = ready_count
-                errors = failed_count
-                elapsed = time.time() - start
-                echo(f"  [{elapsed:5.1f}s] Completed: {completed:3d} | Failed: {errors:3d} | Pending: {num_tasks-completed-errors:3d}")
+            # Get states safely
+            ready, successful, failed, pending, errors = get_task_states(result)
             
+            # Print progress
+            echo(f"[container-id: {container_id}] [{elapsed:6.1f}s] Ready: {ready:4d} | "
+                 f"Success: {successful:4d} | "
+                 f"Failed: {failed:4d} | "
+                 f"Pending: {pending:4d}")
+            
+            if errors:
+                echo(f"  ⚠️  Errors checking tasks: {len(errors)}")
+            
+            # Check for completion
+            if ready >= num_tasks:
+                echo("\n✓ All tasks processed")
+                break
+            
+            # Check for stall
+            if ready == last_ready:
+                stall_count += 1
+                if stall_count >= 30:  # No progress for 60s (30 × 2s)
+                    echo("\n⚠️  No progress for 60s - tasks appear stuck")
+                    echo(f"  Last state: {ready}/{num_tasks} ready")
+                    break
+            else:
+                stall_count = 0
+            
+            last_ready = ready
             time.sleep(2)
         
+        # Final report
         duration = time.time() - start
-        successful = sum(1 for r in result.results if r.successful())
-        failed = sum(1 for r in result.results if r.failed())
+        ready, successful, failed, pending, errors = get_task_states(result)
         
         echo(f"\n" + "=" * 70)
-        echo(f"📈 RESULTS after {duration:.1f}s:")
-        echo(f"   Successful: {successful}/{num_tasks}")
-        echo(f"   Failed: {failed}/{num_tasks}")
-        echo(f"   Success rate: {successful/num_tasks*100:.1f}%")
+        echo(f"📈 FINAL RESULTS after {duration:.1f}s:")
+        echo(f"   Total: {num_tasks}")
+        echo(f"   Successful: {successful} ({successful/num_tasks*100:.1f}%)")
+        echo(f"   Failed: {failed} ({failed/num_tasks*100:.1f}%)")
+        echo(f"   Pending: {pending} ({pending/num_tasks*100:.1f}%)")
+        
+        if errors:
+            echo(f"   Check errors: {len(errors)}")
+        
         echo("=" * 70)
         
-        if failed > 0:
-            echo("\n✅ Connection pool exhaustion demonstrated!")
-            echo("   Run diagnostics to confirm root cause")
+        # Diagnosis
+        if failed > num_tasks * 0.1:
+            echo("\n✅ Connection exhaustion demonstrated!")
+            echo(f"   {failed} tasks failed (~{failed/num_tasks*100:.0f}%)")
+        elif pending > num_tasks * 0.1:
+            echo("\n⚠️  Many tasks stuck/pending")
+            echo(f"   {pending} tasks never completed")
+            echo("   Possible: deadlock, worker crash, task timeout")
         else:
-            echo("\n⚠️  All tasks succeeded - pool might be larger than expected")
+            echo("\n✓ Most tasks completed successfully")
             
+    except KeyboardInterrupt:
+        echo("\n⏸  Interrupted")
     except Exception as e:
-        echo(f"\n❌ Exception: {e}")
+        echo(f"\n❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
 
 def scenario_2_result_backend_pressure(num_tasks=180):
     """
