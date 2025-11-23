@@ -26,7 +26,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./app:/app
-    command: celery -A tasks worker --loglevel=info --concurrency=200
+    command: celery -A tasks worker --loglevel=info --concurrency=125
     networks:
       - lab01-network
 
