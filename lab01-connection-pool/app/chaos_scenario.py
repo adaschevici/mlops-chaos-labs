@@ -1,3 +1,4 @@
+from collections import deque
 from click import echo, command, argument, Choice
 from tasks import (
     task_with_extra_connections,
@@ -58,8 +59,14 @@ def get_task_states(result):
     return ready, successful, failed, pending, error_msgs
 
 def scenario_1_connection_explosion(num_tasks=1800):
-    """Version with robust error handling"""
+    """Enhanced with throughput tracking"""
     print_header("SCENARIO 1: Connection Explosion")
+    hostname = get_container_id_via_hostname()
+    
+    echo("📊 Setup:")
+    echo(f"  Total tasks: {num_tasks}")
+    echo(f"  Workers: 3")
+    echo(f"  Concurrency per worker: 80\n")
     
     echo(f"🚀 Submitting {num_tasks} tasks...\n")
     
@@ -71,79 +78,149 @@ def scenario_1_connection_explosion(num_tasks=1800):
     start = time.time()
     result = job.apply_async()
     
-    echo("⏳ Monitoring...\n")
+    echo("⏳ Monitoring progress...\n")
     
+    # Tracking variables
     timeout = 60 * 10
     poll_start = time.time()
     last_ready = 0
+    last_check_time = poll_start
     stall_count = 0
-    container_id =  get_container_id_via_hostname()
+    
+    # For throughput calculation
+    throughput_window = deque(maxlen=10)  # Last 10 measurements
+    checkpoint_interval = 5  # Check every 5 seconds
+    last_checkpoint = poll_start
+    checkpoint_completed = 0
     
     try:
         while (time.time() - poll_start) < timeout:
-            elapsed = time.time() - start
+            current_time = time.time()
+            elapsed = current_time - start
             
             # Get states safely
             ready, successful, failed, pending, errors = get_task_states(result)
             
-            # Print progress
-            echo(f"[container-id: {container_id}] [{elapsed:6.1f}s] Ready: {ready:4d} | "
+            # Calculate throughput metrics
+            time_since_last = current_time - last_check_time
+            tasks_completed_since_last = ready - last_ready
+            
+            # Instantaneous rate (tasks/sec over last interval)
+            instant_rate = tasks_completed_since_last / time_since_last if time_since_last > 0 else 0
+            
+            # Average rate (tasks/sec overall)
+            avg_rate = ready / elapsed if elapsed > 0 else 0
+            
+            # Track throughput every checkpoint interval
+            if current_time - last_checkpoint >= checkpoint_interval:
+                checkpoint_tasks = ready - checkpoint_completed
+                checkpoint_rate = checkpoint_tasks / checkpoint_interval
+                throughput_window.append(checkpoint_rate)
+                
+                checkpoint_completed = ready
+                last_checkpoint = current_time
+            
+            # Rolling average throughput (over last N checkpoints)
+            rolling_avg_rate = sum(throughput_window) / len(throughput_window) if throughput_window else 0
+            
+            # Estimated time remaining
+            if rolling_avg_rate > 0 and pending > 0:
+                eta_seconds = pending / rolling_avg_rate
+                eta_minutes = eta_seconds / 60
+                eta_str = f"{eta_minutes:.1f}m" if eta_minutes >= 1 else f"{eta_seconds:.0f}s"
+            else:
+                eta_str = "unknown"
+            
+            # Progress percentage
+            progress_pct = (ready / num_tasks * 100) if num_tasks > 0 else 0
+            
+            # Print progress with throughput
+            echo(f"Container ID: {hostname}"
+                 "                         ")
+            echo(f"[{elapsed:6.1f}s] "
+                 f"Progress: {ready:4d}/{num_tasks} ({progress_pct:5.1f}%) | "
                  f"Success: {successful:4d} | "
                  f"Failed: {failed:4d} | "
                  f"Pending: {pending:4d}")
             
-            if errors:
-                echo(f"  ⚠️  Errors checking tasks: {len(errors)}")
+            echo(f"           "
+                 f"Rate: {instant_rate:5.1f} t/s (instant) | "
+                 f"{rolling_avg_rate:5.1f} t/s (rolling) | "
+                 f"{avg_rate:5.1f} t/s (avg) | "
+                 f"ETA: {eta_str}")
+            
+            # Detect throughput degradation
+            if len(throughput_window) >= 5:
+                recent_rate = sum(list(throughput_window)[-3:]) / 3
+                older_rate = sum(list(throughput_window)[:3]) / 3
+                
+                if older_rate > 0 and recent_rate < older_rate * 0.5:
+                    echo(f"           ⚠️  Throughput dropped {older_rate:.1f} → {recent_rate:.1f} t/s (50% reduction!)")
+            
+            # Detect stall
+            if ready == last_ready:
+                stall_count += 1
+                if stall_count >= 3:
+                    echo(f"           ⚠️  No progress for {stall_count * 2}s")
+                if stall_count >= 30:  # 60s stall
+                    echo("\n⚠️  No progress for 60s - tasks appear stuck")
+                    break
+            else:
+                if stall_count > 0:
+                    echo(f"           ✓ Resumed after {stall_count * 2}s stall")
+                stall_count = 0
             
             # Check for completion
             if ready >= num_tasks:
                 echo("\n✓ All tasks processed")
                 break
             
-            # Check for stall
-            if ready == last_ready:
-                stall_count += 1
-                if stall_count >= 30:  # No progress for 60s (30 × 2s)
-                    echo("\n⚠️  No progress for 60s - tasks appear stuck")
-                    echo(f"  Last state: {ready}/{num_tasks} ready")
-                    break
-            else:
-                stall_count = 0
-            
             last_ready = ready
+            last_check_time = current_time
             time.sleep(2)
         
-        # Final report
+        # Check timeout
+        if (time.time() - poll_start) >= timeout:
+            echo(f"\n⏱️  Timeout reached after {timeout}s")
+        
+        # Final statistics
         duration = time.time() - start
         ready, successful, failed, pending, errors = get_task_states(result)
         
         echo(f"\n" + "=" * 70)
         echo(f"📈 FINAL RESULTS after {duration:.1f}s:")
-        echo(f"   Total: {num_tasks}")
-        echo(f"   Successful: {successful} ({successful/num_tasks*100:.1f}%)")
-        echo(f"   Failed: {failed} ({failed/num_tasks*100:.1f}%)")
-        echo(f"   Pending: {pending} ({pending/num_tasks*100:.1f}%)")
+        echo(f"   Total tasks: {num_tasks}")
+        echo(f"   Completed: {ready} ({ready/num_tasks*100:.1f}%)")
+        echo(f"   ├─ Successful: {successful} ({successful/num_tasks*100:.1f}%)")
+        echo(f"   └─ Failed: {failed} ({failed/num_tasks*100:.1f}%)")
+        echo(f"   Pending/Lost: {pending} ({pending/num_tasks*100:.1f}%)")
+        echo(f"\n   Overall throughput: {ready/duration:.2f} tasks/sec")
+        echo(f"   Average duration: {duration/ready:.2f}s per task")
         
-        if errors:
-            echo(f"   Check errors: {len(errors)}")
+        if successful > 0:
+            echo(f"   Success rate: {successful/ready*100:.1f}% (of completed)")
         
         echo("=" * 70)
         
         # Diagnosis
         if failed > num_tasks * 0.1:
-            echo("\n✅ Connection exhaustion demonstrated!")
+            echo("\n✅ Connection pool exhaustion demonstrated!")
             echo(f"   {failed} tasks failed (~{failed/num_tasks*100:.0f}%)")
         elif pending > num_tasks * 0.1:
             echo("\n⚠️  Many tasks stuck/pending")
             echo(f"   {pending} tasks never completed")
-            echo("   Possible: deadlock, worker crash, task timeout")
         else:
             echo("\n✓ Most tasks completed successfully")
             
     except KeyboardInterrupt:
         echo("\n⏸  Interrupted")
+        duration = time.time() - start
+        ready, successful, failed, pending, _ = get_task_states(result)
+        echo(f"\nCompleted {ready}/{num_tasks} tasks in {duration:.1f}s")
+        echo(f"Average rate: {ready/duration:.2f} tasks/sec")
+        
     except Exception as e:
-        echo(f"\n❌ Fatal error: {e}")
+        echo(f"\n❌ Exception: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
 
