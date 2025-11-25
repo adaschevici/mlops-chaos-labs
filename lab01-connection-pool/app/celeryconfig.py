@@ -1,15 +1,15 @@
-broker_url = 'redis://redis:6379/0'
-result_backend = 'redis://redis:6379/0'
+broker_url = "redis://redis:6379/0"
+result_backend = "redis://redis:6379/0"
 
 
 # THE REAL PROBLEM: Pool too small + high concurrency
-broker_pool_limit = 100  # ← Even smaller!
+broker_pool_limit = 50  # ← Even smaller!
 result_backend_transport_options = {
-    'max_connections': 100  # ← Only 1 connection for results!
+    "max_connections": 50  # ← Only 1 connection for results!
 }
 
 # Make it worse
-worker_prefetch_multiplier = 200  # Workers grab LOTS of tasks
+worker_prefetch_multiplier = 50  # Workers grab LOTS of tasks
 task_acks_late = True  # Don't ack until complete
 worker_max_tasks_per_child = None  # Never restart
 

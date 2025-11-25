@@ -26,9 +26,60 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./app:/app
-    command: celery -A tasks worker --loglevel=info --concurrency=125
+    command: celery -A tasks worker --loglevel=info --concurrency=175
     networks:
       - lab01-network
+
+  # Monitoring stack
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: lab01-redis-exporter
+    depends_on:
+      - redis
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - lab01-network
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lab01-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - lab01-network
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lab01-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-data:/var/lib/grafana
+    networks:
+      - lab01-network
+
+
+volumes:
+  prometheus-data:
+  grafana-data:
 
 networks:
   lab01-network:
