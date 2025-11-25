@@ -1,0 +1,24 @@
+# monitoring/prometheus.yml
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+# Alert rules
+rule_files:
+  - 'alerts.yml'
+
+scrape_configs:
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+  
+  # Node/system metrics (if you add node-exporter)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+  
+  # Celery metrics (if you instrument your workers)
+  - job_name: 'celery'
+    static_configs:
+      - targets: ['celery-worker:8000']

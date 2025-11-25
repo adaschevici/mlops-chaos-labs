@@ -1,0 +1,78 @@
+# monitoring/alerts.yml
+groups:
+  - name: redis_alerts
+    interval: 10s
+    rules:
+      # Connection Pool Exhaustion
+      - alert: RedisConnectionPoolNearLimit
+        expr: redis_connected_clients / redis_config_maxclients > 0.8
+        for: 1m
+        labels:
+          severity: warning
+          scenario: connection_exhaustion
+        annotations:
+          summary: "Redis connection pool at {{ $value | humanizePercentage }} capacity"
+          description: "{{ $value | humanizePercentage }} of maxclients used. May cause connection timeouts."
+      
+      - alert: RedisConnectionPoolExhausted
+        expr: redis_connected_clients / redis_config_maxclients > 0.95
+        for: 30s
+        labels:
+          severity: critical
+          scenario: connection_exhaustion
+        annotations:
+          summary: "Redis connection pool critically full"
+          description: "{{ $value | humanizePercentage }} of maxclients used. Connections likely being rejected!"
+      
+      # Memory Exhaustion
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          scenario: memory_exhaustion
+        annotations:
+          summary: "Redis memory usage at {{ $value | humanizePercentage }}"
+          description: "May trigger eviction or OOM"
+      
+      - alert: RedisMemoryCritical
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          scenario: memory_exhaustion
+        annotations:
+          summary: "Redis memory critically high"
+          description: "Eviction or OOM imminent"
+      
+      # Result Backend Bloat
+      - alert: CeleryResultKeyAccumulation
+        expr: redis_db_keys{db="db0"} > 10000
+        for: 5m
+        labels:
+          severity: warning
+          scenario: result_bloat
+        annotations:
+          summary: "{{ $value }} keys in Redis (likely celery-task-meta-*)"
+          description: "Result keys accumulating. Check result_expires setting."
+      
+      # Connection Rejections
+      - alert: RedisRejectingConnections
+        expr: increase(redis_rejected_connections_total[1m]) > 0
+        labels:
+          severity: critical
+          scenario: connection_exhaustion
+        annotations:
+          summary: "Redis rejecting connections"
+          description: "{{ $value }} connections rejected in last minute. maxclients reached!"
+      
+      # Slow Operations
+      - alert: RedisSlowOperations
+        expr: redis_slowlog_length > 10
+        for: 2m
+        labels:
+          severity: warning
+          scenario: performance_degradation
+        annotations:
+          summary: "Redis slow operations detected"
+          description: "{{ $value }} slow operations logged"

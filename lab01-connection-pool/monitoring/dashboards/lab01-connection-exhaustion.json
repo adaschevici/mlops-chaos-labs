@@ -1,0 +1,323 @@
+{
+  "dashboard": {
+    "title": "Lab 01 - Connection Pool Exhaustion",
+    "uid": "lab01-connection-exhaustion",
+    "tags": [
+      "chaos-lab",
+      "redis",
+      "connections"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Connection Pool Usage",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Connected Clients",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_config_maxclients",
+            "legendFormat": "Max Clients Limit",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "Connections",
+              "fillOpacity": 10,
+              "lineWidth": 2
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 2000
+                },
+                {
+                  "color": "red",
+                  "value": 2400
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Connection Pool Usage %",
+        "type": "gauge",
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "redis_connected_clients / redis_config_maxclients * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 50
+                },
+                {
+                  "color": "orange",
+                  "value": 80
+                },
+                {
+                  "color": "red",
+                  "value": 95
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 3,
+        "title": "Rejected Connections (FAILURE INDICATOR)",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "redis_rejected_connections_total",
+            "legendFormat": "Total Rejected",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(redis_rejected_connections_total[1m])",
+            "legendFormat": "Last Minute",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Connection Activity",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(redis_connections_received_total[30s])",
+            "legendFormat": "New Connections/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(redis_total_commands_processed[30s])",
+            "legendFormat": "Commands/sec",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "axisLabel": "Per Second"
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Redis Throughput (Commands/sec)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(redis_commands_processed_total[30s])",
+            "legendFormat": "Commands/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "fillOpacity": 20
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "\ud83d\udd0d Correlation: Connection Usage vs Throughput",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "redis_connected_clients / redis_config_maxclients * 100",
+            "legendFormat": "Connection Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(redis_commands_processed_total[30s])",
+            "legendFormat": "Throughput (commands/sec)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Throughput (commands/sec)"
+              },
+              "properties": [
+                {
+                  "id": "custom.axisPlacement",
+                  "value": "right"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Current Connection Statistics",
+        "type": "table",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Connected Clients",
+            "refId": "A",
+            "instant": true
+          },
+          {
+            "expr": "redis_config_maxclients",
+            "legendFormat": "Max Clients",
+            "refId": "B",
+            "instant": true
+          },
+          {
+            "expr": "redis_blocked_clients",
+            "legendFormat": "Blocked Clients",
+            "refId": "C",
+            "instant": true
+          },
+          {
+            "expr": "redis_rejected_connections_total",
+            "legendFormat": "Total Rejected",
+            "refId": "D",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "seriesToColumns",
+            "options": {}
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true,
+  "inputs": [],
+  "folderId": 0
+}
