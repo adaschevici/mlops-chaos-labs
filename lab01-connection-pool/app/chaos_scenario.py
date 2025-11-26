@@ -269,7 +269,17 @@ def scenario_1_connection_explosion(num_tasks=1800):
         traceback.print_exc()
 
 
-def scenario_2_result_backend_pressure(num_tasks=180):
+def scenario_2_managed_pool_degradation(num_tasks=100):
+    print_header("SCENARIO 2: Result Backend Exhaustion")
+
+    echo(
+        "📊 Each task blocks the celery managed pool for a random time lapse between 1 and 50 seconds"
+    )
+    echo("  Result backend pool: 2 connection")
+    echo("  All tasks compete for 2 connection!\n")
+
+
+def scenario_3_result_backend_pressure(num_tasks=180):
     """
     Tasks store 5MB results each
     Result backend pool = 1 connection
@@ -313,7 +323,7 @@ def scenario_2_result_backend_pressure(num_tasks=180):
         echo(f"\n❌ Failed: {e}")
 
 
-def scenario_3_streaming_updates():
+def scenario_4_streaming_updates():
     """
     Tasks that update state 20 times
     Each update = result backend write
@@ -341,7 +351,7 @@ def scenario_3_streaming_updates():
         echo(f"\n❌ Failed after {duration:.1f}s: {e}")
 
 
-def scenario_4_mixed_load():
+def scenario_5_mixed_load():
     """
     Combination: blocking tasks + connection-heavy tasks
     = Complete chaos
@@ -370,7 +380,7 @@ def scenario_4_mixed_load():
         for i in range(30)
     )
 
-    start = time.time()
+    _start = time.time()
 
     # Submit all at once
     r1 = blocking.apply_async()
@@ -386,7 +396,7 @@ def scenario_4_mixed_load():
         c_done = sum(1 for r in r2.results if r.ready())
         r_done = sum(1 for r in r3.results if r.ready())
 
-        echo(f"\n📊 After 60s:")
+        echo("\n📊 After 60s:")
         echo(f"  Blocking tasks: {b_done}/10")
         echo(f"  Connection tasks: {c_done}/40")
         echo(f"  Result tasks: {r_done}/30")
@@ -399,9 +409,10 @@ def scenario_4_mixed_load():
 # Map scenario numbers to the actual functions
 SCENARIOS = {
     "1": scenario_1_connection_explosion,
-    "2": scenario_2_result_backend_pressure,
-    "3": scenario_3_streaming_updates,
-    "4": scenario_4_mixed_load,
+    "2": scenario_2_managed_pool_degradation,
+    "3": scenario_3_result_backend_pressure,
+    "4": scenario_4_streaming_updates,
+    "5": scenario_5_mixed_load,
 }
 
 
@@ -414,9 +425,10 @@ def cli(scenario):
     SCENARIO must be '1', '2', '3', or '4'. Defaults to '1'.
 
     1: Connection explosion (tasks open many connections)
-    2: Result backend pressure (large results)
-    3: Streaming updates (many small writes)
-    4: Mixed chaos (combination of all)
+    2: Connection explosion on the managed pool
+    3: Result backend pressure (large results)
+    4: Streaming updates (many small writes)
+    5: Mixed chaos (combination of all)
     """
     echo(f"Selected scenario: {scenario}\n")
 
