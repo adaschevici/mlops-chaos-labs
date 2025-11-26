@@ -1,0 +1,19 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: lab01-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxclients 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lab01-network
+  
+networks:
+  lab01-network:
+    driver: bridge
+
