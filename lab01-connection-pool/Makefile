@@ -5,7 +5,7 @@ DAEMON ?= false
 SERVICE_PATTERN ?= lab01-
 COMPOSE_FILES := -f docker-compose.infra.yml \
 								 -f docker-compose.monitoring.yml \
-								 -f docker-compose.app.yml
+								 -f docker-compose.app_v1.yml
 
 .PHONY: build up down logs shell chaos-test diagnostics diagnose fix clean docker-stats
 

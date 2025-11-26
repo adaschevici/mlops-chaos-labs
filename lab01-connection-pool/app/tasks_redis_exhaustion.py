@@ -5,7 +5,7 @@ import redis
 import json
 
 app = Celery("chaos_lab")
-app.config_from_object("celeryconfig")
+app.config_from_object("celeryconfig_redis")
 
 
 # Each task opens its OWN Redis connection (outside Celery's pool)

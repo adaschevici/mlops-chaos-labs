@@ -1,6 +1,6 @@
 from collections import deque
 from click import echo, command, argument, Choice
-from tasks import (
+from tasks_redis_exhaustion import (
     task_with_extra_connections,
     task_with_result_backend_pressure,
     task_with_streaming_results,

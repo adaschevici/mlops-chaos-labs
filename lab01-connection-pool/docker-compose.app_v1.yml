@@ -1,18 +1,4 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: lab01-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --maxclients 10000
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - lab01-network
-  
   celery-worker:
     build:
       context: ./app
@@ -26,7 +12,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./app:/app
-    command: celery -A tasks worker --loglevel=info --pool=gevent --concurrency=400
+    command: celery -A tasks_redis_exhaustion worker --loglevel=info --pool=gevent --concurrency=400
     networks:
       - lab01-network
 
