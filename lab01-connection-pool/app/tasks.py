@@ -37,7 +37,6 @@ def task_with_extra_connections(self, task_id, operations=10):
             )
             time.sleep(0.5)
 
-        time.sleep(random.uniform(1, 50))  # Simulate work while holding connection
         print(f"Task {task_id} completed {operations} operations")
         return {"task_id": task_id, "operations": operations}
 
@@ -108,6 +107,9 @@ def blocking_task(self, task_id, duration=10):
     # Hold connection for entire duration
     r = get_redis()
 
+    duration = time.sleep(
+        random.uniform(1, 50)
+    )  # Simulate work while holding connection
     try:
         # Set a key and hold the connection
         r.set(f"blocking:{task_id}", "locked")
