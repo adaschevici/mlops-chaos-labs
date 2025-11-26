@@ -1,35 +1,40 @@
 # monitoring/generate_dashboards.py
 import json
-import os
 from pathlib import Path
 
 
 def create_connection_exhaustion_dashboard():
     """
-    Generate dashboard specifically for connection exhaustion scenario
+    Generate dashboard compatible with latest Grafana
     """
     dashboard = {
         "title": "Lab 01 - Connection Pool Exhaustion",
         "uid": "lab01-connection-exhaustion",
         "tags": ["chaos-lab", "redis", "connections"],
         "timezone": "browser",
-        "schemaVersion": 16,
+        "schemaVersion": 38,  # Updated for latest Grafana
         "version": 0,
         "refresh": "5s",
+        "time": {"from": "now-15m", "to": "now"},
+        "timepicker": {},
+        "fiscalYearStartMonth": 0,
         "panels": [
-            # Panel 1: Connection Usage Overview
+            # Panel 1: Connection Pool Usage
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 1,
                 "title": "Connection Pool Usage",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_connected_clients",
                         "legendFormat": "Connected Clients",
                         "refId": "A",
                     },
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_config_maxclients",
                         "legendFormat": "Max Clients Limit",
                         "refId": "B",
@@ -39,10 +44,27 @@ def create_connection_exhaustion_dashboard():
                     "defaults": {
                         "color": {"mode": "palette-classic"},
                         "custom": {
+                            "axisCenteredZero": False,
+                            "axisColorMode": "text",
                             "axisLabel": "Connections",
+                            "axisPlacement": "auto",
                             "fillOpacity": 10,
+                            "gradientMode": "none",
                             "lineWidth": 2,
+                            "spanNulls": False,
+                            "drawStyle": "line",
+                            "lineInterpolation": "linear",
+                            "barAlignment": 0,
+                            "showPoints": "never",
+                            "pointSize": 5,
+                            "stacking": {"mode": "none", "group": "A"},
+                            "hideFrom": {
+                                "tooltip": False,
+                                "viz": False,
+                                "legend": False,
+                            },
                         },
+                        "mappings": [],
                         "thresholds": {
                             "mode": "absolute",
                             "steps": [
@@ -51,21 +73,29 @@ def create_connection_exhaustion_dashboard():
                                 {"color": "red", "value": 2400},
                             ],
                         },
-                    }
+                    },
+                    "overrides": [],
                 },
                 "options": {
-                    "tooltip": {"mode": "multi"},
-                    "legend": {"displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"},
+                    "legend": {
+                        "showLegend": True,
+                        "displayMode": "list",
+                        "placement": "bottom",
+                        "calcs": [],
+                    },
                 },
             },
             # Panel 2: Usage Percentage Gauge
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 2,
                 "title": "Connection Pool Usage %",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_connected_clients / redis_config_maxclients * 100",
                         "refId": "A",
                     }
@@ -84,31 +114,36 @@ def create_connection_exhaustion_dashboard():
                                 {"color": "red", "value": 95},
                             ],
                         },
-                    }
+                        "mappings": [],
+                    },
+                    "overrides": [],
                 },
-                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
+                "options": {
+                    "orientation": "auto",
+                    "showThresholdLabels": True,
+                    "showThresholdMarkers": True,
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
             },
-            # Panel 3: Rejected Connections (Critical!)
+            # Panel 3: Rejected Connections
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 3,
                 "title": "Rejected Connections (FAILURE INDICATOR)",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_rejected_connections_total",
                         "legendFormat": "Total Rejected",
                         "refId": "A",
-                    },
-                    {
-                        "expr": "increase(redis_rejected_connections_total[1m])",
-                        "legendFormat": "Last Minute",
-                        "refId": "B",
-                    },
+                    }
                 ],
                 "fieldConfig": {
                     "defaults": {
                         "color": {"mode": "thresholds"},
+                        "mappings": [],
                         "thresholds": {
                             "mode": "absolute",
                             "steps": [
@@ -116,42 +151,78 @@ def create_connection_exhaustion_dashboard():
                                 {"color": "red", "value": 1},
                             ],
                         },
-                    }
+                    },
+                    "overrides": [],
                 },
                 "options": {
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                    "orientation": "auto",
+                    "textMode": "auto",
                     "colorMode": "background",
-                    "graphMode": "none",
-                    "textMode": "value_and_name",
+                    "graphMode": "area",
+                    "justifyMode": "auto",
                 },
             },
-            # Panel 4: Connection Rate
+            # Panel 4: Connection Activity
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 4,
                 "title": "Connection Activity",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "rate(redis_connections_received_total[30s])",
                         "legendFormat": "New Connections/sec",
                         "refId": "A",
-                    },
-                    {
-                        "expr": "rate(redis_total_commands_processed[30s])",
-                        "legendFormat": "Commands/sec",
-                        "refId": "B",
-                    },
+                    }
                 ],
-                "fieldConfig": {"defaults": {"custom": {"axisLabel": "Per Second"}}},
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "axisCenteredZero": False,
+                            "axisColorMode": "text",
+                            "axisLabel": "Per Second",
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 10,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 1,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": False,
+                        },
+                        "mappings": [],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [{"color": "green", "value": None}],
+                        },
+                    },
+                    "overrides": [],
+                },
+                "options": {
+                    "legend": {
+                        "calcs": [],
+                        "displayMode": "list",
+                        "placement": "bottom",
+                        "showLegend": True,
+                    },
+                    "tooltip": {"mode": "multi", "sort": "none"},
+                },
             },
-            # Panel 5: Commands Processed (Throughput)
+            # Panel 5: Redis Throughput
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 5,
                 "title": "Redis Throughput (Commands/sec)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "rate(redis_commands_processed_total[30s])",
                         "legendFormat": "Commands/sec",
                         "refId": "A",
@@ -160,29 +231,82 @@ def create_connection_exhaustion_dashboard():
                 "fieldConfig": {
                     "defaults": {
                         "color": {"mode": "palette-classic"},
-                        "custom": {"fillOpacity": 20},
-                    }
+                        "custom": {
+                            "axisCenteredZero": False,
+                            "axisColorMode": "text",
+                            "axisLabel": "",
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 20,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 1,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": False,
+                        },
+                        "mappings": [],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [{"color": "green", "value": None}],
+                        },
+                    },
+                    "overrides": [],
+                },
+                "options": {
+                    "legend": {
+                        "calcs": [],
+                        "displayMode": "list",
+                        "placement": "bottom",
+                        "showLegend": True,
+                    },
+                    "tooltip": {"mode": "multi", "sort": "none"},
                 },
             },
             # Panel 6: Correlation View
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 6,
                 "title": "🔍 Correlation: Connection Usage vs Throughput",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_connected_clients / redis_config_maxclients * 100",
                         "legendFormat": "Connection Usage %",
                         "refId": "A",
                     },
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "rate(redis_commands_processed_total[30s])",
                         "legendFormat": "Throughput (commands/sec)",
                         "refId": "B",
                     },
                 ],
                 "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "axisCenteredZero": False,
+                            "axisColorMode": "text",
+                            "axisLabel": "",
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 10,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 1,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": False,
+                        },
+                        "mappings": [],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [{"color": "green", "value": None}],
+                        },
+                    },
                     "overrides": [
                         {
                             "matcher": {
@@ -193,43 +317,85 @@ def create_connection_exhaustion_dashboard():
                                 {"id": "custom.axisPlacement", "value": "right"}
                             ],
                         }
-                    ]
+                    ],
                 },
-                "options": {"tooltip": {"mode": "multi"}},
+                "options": {
+                    "legend": {
+                        "calcs": [],
+                        "displayMode": "list",
+                        "placement": "bottom",
+                        "showLegend": True,
+                    },
+                    "tooltip": {"mode": "multi", "sort": "none"},
+                },
             },
             # Panel 7: Current Stats Table
             {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 7,
                 "title": "Current Connection Statistics",
                 "type": "table",
                 "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
                 "targets": [
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_connected_clients",
                         "legendFormat": "Connected Clients",
                         "refId": "A",
                         "instant": True,
+                        "format": "table",
                     },
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_config_maxclients",
                         "legendFormat": "Max Clients",
                         "refId": "B",
                         "instant": True,
+                        "format": "table",
                     },
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_blocked_clients",
                         "legendFormat": "Blocked Clients",
                         "refId": "C",
                         "instant": True,
+                        "format": "table",
                     },
                     {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_rejected_connections_total",
                         "legendFormat": "Total Rejected",
                         "refId": "D",
                         "instant": True,
+                        "format": "table",
                     },
                 ],
-                "transformations": [{"id": "seriesToColumns", "options": {}}],
+                "transformations": [{"id": "merge", "options": {}}],
+                "options": {
+                    "showHeader": True,
+                    "cellHeight": "sm",
+                    "footer": {
+                        "show": False,
+                        "reducer": ["sum"],
+                        "countRows": False,
+                        "fields": "",
+                    },
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "custom": {
+                            "align": "auto",
+                            "cellOptions": {"type": "auto"},
+                            "inspect": False,
+                        },
+                        "mappings": [],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [{"color": "green", "value": None}],
+                        },
+                    },
+                    "overrides": [],
+                },
             },
         ],
     }
@@ -238,18 +404,16 @@ def create_connection_exhaustion_dashboard():
 
 
 def save_dashboard(dashboard, filename="lab01-connection-exhaustion.json"):
-    """Save dashboard to file"""
-    # Wrap in the format Grafana expects
-    output = {"dashboard": dashboard, "overwrite": True, "inputs": [], "folderId": 0}
-
+    """Save dashboard to file in Grafana import format"""
     # Ensure directory exists
     target_dir = Path("monitoring/dashboards")
     target_dir.mkdir(parents=True, exist_ok=True)
 
     filepath = target_dir / filename
 
+    # Write the dashboard directly (no wrapper needed for file provisioning)
     with filepath.open("w") as f:
-        json.dump(output, f, indent=2)
+        json.dump(dashboard, f, indent=2)
 
     print(f"✓ Dashboard saved to: {filepath}")
     return filepath
@@ -260,17 +424,14 @@ def main():
     print("-" * 60)
 
     dashboard = create_connection_exhaustion_dashboard()
-    filepath = save_dashboard(dashboard)
+    _filepath = save_dashboard(dashboard)
 
     print("\nDashboard generated successfully!")
     print("\nNext steps:")
-    print("  1. Make sure docker-compose is running: docker-compose up -d")
-    print("  2. Dashboard will auto-load in Grafana")
+    print("  1. Restart Grafana: docker-compose restart grafana")
+    print("  2. Wait 10 seconds for provisioning")
     print("  3. Open: http://localhost:3000")
     print("  4. Navigate to: Dashboards → Lab 01 - Connection Pool Exhaustion")
-    print("\nOr import manually:")
-    print("  - Go to Grafana → Dashboards → Import")
-    print(f"  - Upload: {filepath}")
 
 
 if __name__ == "__main__":

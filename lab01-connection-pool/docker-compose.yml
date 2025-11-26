@@ -26,7 +26,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./app:/app
-    command: celery -A tasks worker --loglevel=info --concurrency=175
+    command: celery -A tasks worker --loglevel=info --concurrency=160
     networks:
       - lab01-network
 
@@ -71,7 +71,7 @@ services:
     volumes:
       - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
       - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     networks:
       - lab01-network

@@ -29,7 +29,7 @@ def scenario_1_connection_explosion(num_tasks=1800):
     echo("📊 Setup:")
     echo(f"  Total tasks: {num_tasks}")
     echo("  Workers: 3")
-    echo("  Concurrency per worker: 80\n")
+    echo("  Concurrency per worker: 150\n")
 
     echo(f"🚀 Submitting {num_tasks} tasks...\n")
 
@@ -88,11 +88,6 @@ def scenario_1_connection_explosion(num_tasks=1800):
             # Average rate (tasks/sec overall)
             avg_rate = ready / elapsed if elapsed > 0 else 0
             # Redis
-            redis_stats = get_redis_stats()
-            if redis_stats:
-                conn_info = f"{redis_stats['connected_clients']:4d}/{redis_stats['maxclients']} ({redis_stats['usage_percent']:5.1f}%)"
-            else:
-                conn_info = "N/A"
             # Get Redis stats
             redis_stats = get_redis_stats()
             if redis_stats:
