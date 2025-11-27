@@ -173,7 +173,9 @@ def create_connection_exhaustion_dashboard():
                     ],
                 },
             },
-            # NEW Panel 5: Current Task Rate Gauge
+            # ------------------------------------------------------------------
+            # UPDATED Panel 5: Current Task Rate Gauge (REVERSED LOGIC)
+            # ------------------------------------------------------------------
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 5,
@@ -191,18 +193,24 @@ def create_connection_exhaustion_dashboard():
                     "defaults": {
                         "unit": "ops",
                         "min": 0,
-                        "max": 30,
+                        "max": 150,  # Increased to accommodate 118+ ops/s
                         "thresholds": {
+                            "mode": "absolute",
                             "steps": [
-                                {"color": "green", "value": None},
-                                {"color": "yellow", "value": 10},
-                                {"color": "orange", "value": 5},
-                                {"color": "red", "value": 2},
-                            ]
+                                {"color": "red", "value": 0},  # 0-10: Critical
+                                {"color": "orange", "value": 10},  # 10-30: Poor
+                                {"color": "yellow", "value": 30},  # 30-70: Moderate
+                                {"color": "green", "value": 70},  # 70+: Excellent
+                            ],
                         },
                     }
                 },
-                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
+                "options": {
+                    "showThresholdLabels": True,
+                    "showThresholdMarkers": True,
+                    "orientation": "auto",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
             },
             # NEW Panel 6: Tasks In Progress
             {
@@ -460,9 +468,9 @@ def main():
     print("  ✓ Success rate tracking")
     print("  ✓ Correlation view (connections vs throughput)")
     print("\nNext steps:")
-    print("  1. Rebuild workers: docker-compose build")
-    print("  2. Restart: docker-compose restart")
-    print("  3. Open: http://localhost:3000/d/lab01-connection-exhaustion")
+    print("  1. Run this script: python monitoring/generate_dashboards.py")
+    print("  2. If using file provisioning, restart Grafana.")
+    print("  3. Open: http://localhost:3000/d/lab01-connection-exhaustion-enhanced")
 
 
 if __name__ == "__main__":
