@@ -1,8 +1,10 @@
-from gevent import monkey
+from gevent import monkey, spawn
+from gevent.pywsgi import WSGIServer  # Import the Native Gevent Server
 
 monkey.patch_all()
 
-from celery import Celery
+
+from celery import Celery, bootsteps
 
 # Start metrics when worker initializes
 from celery.signals import worker_process_init, worker_process_shutdown
@@ -10,7 +12,7 @@ import time
 import random
 import redis
 import json
-from prometheus_client import Counter, Histogram, Gauge, start_http_server
+from prometheus_client import Counter, Histogram, Gauge, make_wsgi_app
 import threading
 import os
 import socket
@@ -40,44 +42,45 @@ tasks_in_progress = Gauge(
     ["task_name", "worker"],
 )
 
-# Start metrics server on port 8000 (only once per worker)
-_metrics_started = False
-_metrics_lock = threading.Lock()
 
+class PrometheusServerStep(bootsteps.StartStopStep):
+    """
+    A custom Bootstep that launches the Prometheus server
+    when the Celery Worker starts.
+    """
 
-def start_metrics_server():
-    """Start Prometheus metrics HTTP server"""
-    global _metrics_started
+    requires = {"celery.worker.components:Timer"}
 
-    with _metrics_lock:
-        if _metrics_started:
-            return
+    def __init__(self, worker, **kwargs):
+        self.server = None
+        super().__init__(worker, **kwargs)
 
+    def start(self, worker):
+        print("🚀 Bootstep: initializing Prometheus metrics server...")
         try:
-            # Start on port 8000
-            start_http_server(8000)
-            _metrics_started = True
-            print(f"📊 Metrics server started on :8000 for worker {WORKER_NAME}")
-        except OSError as e:
-            if "Address already in use" in str(e):
-                print("⚠️  Port 8000 already in use, metrics may already be running")
-                _metrics_started = True
-            else:
-                print(f"❌ Failed to start metrics server: {e}")
-                raise
+            # Create the WSGI app (No threading involved)
+            app = make_wsgi_app()
+
+            # Bind the server to 0.0.0.0:8000
+            # log=None quiets the access logs
+            self.server = WSGIServer(("0.0.0.0", 8000), app, log=None)
+
+            # Start listening (Non-blocking in Gevent)
+            self.server.start()
+            print("📊 Metrics Server listening on 0.0.0.0:8000")
+
+        except Exception as e:
+            print(f"❌ Failed to start metrics bootstep: {e}")
+
+    def stop(self, worker):
+        # Clean shutdown when worker exits
+        if self.server:
+            print("🛑 Stopping metrics server...")
+            self.server.stop()
 
 
-@worker_process_init.connect
-def init_worker_process(**kwargs):
-    """Initialize when worker process starts"""
-    print(f"🔧 Initializing worker process: {WORKER_NAME}")
-    start_metrics_server()
-
-
-@worker_process_shutdown.connect
-def shutdown_worker_process(**kwargs):
-    """Cleanup when worker shuts down"""
-    print(f"👋 Shutting down worker: {WORKER_NAME}")
+# Register the bootstep with the worker
+app.steps["worker"].add(PrometheusServerStep)
 
 
 # Each task opens its OWN Redis connection (outside Celery's pool)
