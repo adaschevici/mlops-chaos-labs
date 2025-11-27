@@ -21,6 +21,8 @@ services:
       - CONTAINERS=1 # Allow listing containers
       - NETWORKS=1
     # only uncomment if you want to test from the host using curl
+    # curl -i http://localhost:2375/containers/json
+    # curl -i http://localhost:2375/networks
     # ports:
     #   - "127.0.0.1:2375:2375" # <--- Map to localhost only for security
     networks:
