@@ -1,11 +1,83 @@
+from gevent import monkey
+
+monkey.patch_all()
+
 from celery import Celery
+
+# Start metrics when worker initializes
+from celery.signals import worker_process_init, worker_process_shutdown
 import time
 import random
 import redis
 import json
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+import threading
+import os
+import socket
 
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
+
+
+# Get worker name from environment or hostname
+WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
+
+# Prometheus metrics
+task_counter = Counter(
+    "celery_task_total", "Total number of tasks", ["task_name", "status", "worker"]
+)
+
+task_duration = Histogram(
+    "celery_task_duration_seconds",
+    "Task execution duration",
+    ["task_name", "worker"],
+    buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+)
+
+tasks_in_progress = Gauge(
+    "celery_tasks_in_progress",
+    "Number of tasks currently executing",
+    ["task_name", "worker"],
+)
+
+# Start metrics server on port 8000 (only once per worker)
+_metrics_started = False
+_metrics_lock = threading.Lock()
+
+
+def start_metrics_server():
+    """Start Prometheus metrics HTTP server"""
+    global _metrics_started
+
+    with _metrics_lock:
+        if _metrics_started:
+            return
+
+        try:
+            # Start on port 8000
+            start_http_server(8000)
+            _metrics_started = True
+            print(f"📊 Metrics server started on :8000 for worker {WORKER_NAME}")
+        except OSError as e:
+            if "Address already in use" in str(e):
+                print("⚠️  Port 8000 already in use, metrics may already be running")
+                _metrics_started = True
+            else:
+                print(f"❌ Failed to start metrics server: {e}")
+                raise
+
+
+@worker_process_init.connect
+def init_worker_process(**kwargs):
+    """Initialize when worker process starts"""
+    print(f"🔧 Initializing worker process: {WORKER_NAME}")
+    start_metrics_server()
+
+
+@worker_process_shutdown.connect
+def shutdown_worker_process(**kwargs):
+    """Cleanup when worker shuts down"""
+    print(f"👋 Shutting down worker: {WORKER_NAME}")
 
 
 # Each task opens its OWN Redis connection (outside Celery's pool)
@@ -22,6 +94,12 @@ def task_with_extra_connections(self, task_id, operations=10):
     """
     print(f"Task {task_id} starting - will open {operations} connections")
 
+    task_name = "task_with_extra_connections"
+
+    # Track task start
+    tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).inc()
+    start_time = time.time()
+
     connections = []
 
     try:
@@ -33,18 +111,54 @@ def task_with_extra_connections(self, task_id, operations=10):
             # Do work that holds the connection
             r.set(
                 f"task:{task_id}:step:{i}",
-                json.dumps({"status": "processing", "timestamp": time.time()}),
+                json.dumps(
+                    {
+                        "status": "processing",
+                        "timestamp": time.time(),
+                        "worker": WORKER_NAME,
+                    }
+                ),
             )
             time.sleep(0.5)
 
+        time.sleep(random.uniform(1, 10))  # Simulate processing
+
+        # Record success
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="success", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
         print(f"Task {task_id} completed {operations} operations")
-        return {"task_id": task_id, "operations": operations}
+        return {
+            "task_id": task_id,
+            "operations": operations,
+            "worker": WORKER_NAME,
+            "duration": duration,
+        }
 
     except redis.exceptions.ConnectionError as e:
         print(f"Task {task_id} FAILED: Connection error - {e}")
+
+        # Record failure
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="failure", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
         raise
     except Exception as e:
         print(f"Task {task_id} FAILED: {e}")
+
+        # Record failure
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="failure", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
         raise
     finally:
         # Clean up connections (but damage is done)

@@ -6,6 +6,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     vim \
+    curl \
+    iproute2 \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (better caching)

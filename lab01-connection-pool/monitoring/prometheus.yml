@@ -22,3 +22,21 @@ scrape_configs:
   - job_name: 'celery'
     static_configs:
       - targets: ['celery-worker:8000']
+
+  - job_name: 'celery-workers'
+    docker_sd_configs:
+      - host: tcp://docker-proxy:2375 # Connect to the proxy service
+    
+    relabel_configs:
+      # 1. Only scrape containers with this specific label
+      #    (You need to add this label to your celery-worker service in compose)
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        regex: celery-worker
+        action: keep
+
+      # 2. (Optional) Set the hostname in Prometheus to the container name 
+      #    so it looks nice in Grafana (e.g., "project-celery-worker-1")
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(.*)'
+        target_label: instance
+        replacement: '$1'

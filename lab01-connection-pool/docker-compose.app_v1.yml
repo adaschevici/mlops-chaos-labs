@@ -7,9 +7,13 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    labels:
+      - __meta_docker_container_label_com_docker_compose_service
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "8000-8010:8000"
     volumes:
       - ./app:/app
     command: celery -A tasks_redis_exhaustion worker --loglevel=info --pool=gevent --concurrency=400
