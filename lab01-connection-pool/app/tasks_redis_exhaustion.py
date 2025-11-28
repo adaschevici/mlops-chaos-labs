@@ -164,6 +164,7 @@ def task_with_extra_connections(self, task_id, operations=10):
 
         raise
     finally:
+        tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
         # Clean up connections (but damage is done)
         for r in connections:
             try:
