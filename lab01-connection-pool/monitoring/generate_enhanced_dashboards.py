@@ -240,29 +240,29 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
-            # Panel 11: Celery Broker Pool Usage
+            # Panel 11: Redis Broker Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 11,
-                "title": "🔌 Celery Broker Pool Usage",
+                "title": "🔌 Redis Broker Pool (Celery-Managed)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_broker_pool_size",
-                        "legendFormat": "Pool Size (Total)",
+                        "expr": "redis_pool_size{pool_type='broker'}",
+                        "legendFormat": "Pool Max Size",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_broker_pool_in_use",
+                        "expr": "redis_pool_in_use{pool_type='broker'}",
                         "legendFormat": "Connections In Use",
                         "refId": "B",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_broker_pool_available",
+                        "expr": "redis_pool_available{pool_type='broker'}",
                         "legendFormat": "Connections Available",
                         "refId": "C",
                     },
@@ -274,7 +274,6 @@ def create_connection_exhaustion_dashboard():
                             "axisLabel": "Connections",
                             "fillOpacity": 15,
                             "lineWidth": 2,
-                            "drawStyle": "line",
                         },
                     },
                     "overrides": [
@@ -287,7 +286,7 @@ def create_connection_exhaustion_dashboard():
                                 {
                                     "id": "color",
                                     "value": {"fixedColor": "orange", "mode": "fixed"},
-                                }
+                                },
                             ],
                         },
                         {
@@ -299,13 +298,13 @@ def create_connection_exhaustion_dashboard():
                                 {
                                     "id": "color",
                                     "value": {"fixedColor": "green", "mode": "fixed"},
-                                }
+                                },
                             ],
                         },
                     ],
                 },
             },
-            # Panel 12: Broker Pool Saturation Gauge
+            # Panel 12: Broker Pool Saturation
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 12,
@@ -315,7 +314,7 @@ def create_connection_exhaustion_dashboard():
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_broker_pool_in_use / celery_broker_pool_size * 100",
+                        "expr": "redis_pool_in_use{pool_type='broker'} / redis_pool_size{pool_type='broker'} * 100",
                         "refId": "A",
                     }
                 ],
@@ -335,22 +334,19 @@ def create_connection_exhaustion_dashboard():
                         },
                     }
                 },
-                "options": {
-                    "showThresholdLabels": True,
-                    "showThresholdMarkers": True,
-                },
+                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
             },
-            # Panel 13: Pool Availability Stat
+            # Panel 13: Queue Depth
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 13,
-                "title": "Available Pool Connections",
+                "title": "Task Queue Depth",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 40},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_broker_pool_available",
+                        "expr": "celery_task_queue_depth{queue_name='celery'}",
                         "refId": "A",
                     }
                 ],
@@ -359,9 +355,9 @@ def create_connection_exhaustion_dashboard():
                         "color": {"mode": "thresholds"},
                         "thresholds": {
                             "steps": [
-                                {"color": "red", "value": 0},
-                                {"color": "yellow", "value": 2},
-                                {"color": "green", "value": 5},
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 100},
+                                {"color": "red", "value": 500},
                             ]
                         },
                     }

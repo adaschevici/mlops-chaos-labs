@@ -1,14 +1,15 @@
 # ruff: noqa: E402
-import gevent
 from gevent import monkey, spawn
-from gevent.pywsgi import WSGIServer  # Import the Native Gevent Server
+from gevent.pywsgi import WSGIServer
 
 monkey.patch_all()
 
-
 from celery import Celery, bootsteps
-
-# Start metrics when worker initializes
+from celery.signals import (
+    worker_process_init,
+    worker_process_shutdown,
+    before_task_publish,
+)
 import time
 import random
 import redis
@@ -16,10 +17,10 @@ import json
 from prometheus_client import Counter, Histogram, Gauge, make_wsgi_app
 import os
 import socket
+import gevent
 
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
-
 
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
@@ -42,69 +43,85 @@ tasks_in_progress = Gauge(
     ["task_name", "worker"],
 )
 
-# Add new metrics for Celery's broker pool
-celery_broker_pool_size = Gauge(
-    "celery_broker_pool_size", "Celery broker connection pool size", ["worker"]
+# Queue and broker metrics
+celery_task_queue_depth = Gauge(
+    "celery_task_queue_depth", "Tasks waiting in queue", ["queue_name", "worker"]
 )
 
-celery_broker_pool_available = Gauge(
-    "celery_broker_pool_available", "Available connections in broker pool", ["worker"]
+celery_broker_operations = Counter(
+    "celery_broker_operations_total", "Total broker operations", ["operation", "worker"]
 )
 
-celery_broker_pool_in_use = Gauge(
-    "celery_broker_pool_in_use",
-    "Connections currently in use from broker pool",
-    ["worker"],
+# Redis connection pool metrics (from redis-py directly)
+redis_pool_size = Gauge(
+    "redis_pool_size", "Redis connection pool max size", ["pool_type", "worker"]
+)
+
+redis_pool_available = Gauge(
+    "redis_pool_available",
+    "Available connections in Redis pool",
+    ["pool_type", "worker"],
+)
+
+redis_pool_in_use = Gauge(
+    "redis_pool_in_use", "In-use connections in Redis pool", ["pool_type", "worker"]
 )
 
 
-def monitor_celery_pools():
+def monitor_redis_pools():
     """
-    Gevent greenlet to monitor Celery's internal connection pools.
-    This runs continuously and updates Prometheus metrics.
+    Monitor Redis connection pools directly.
+    This tracks both application-level and Celery-managed pools.
     """
     while True:
         try:
-            # Access the connection pool from the broker connection
-            # For Redis broker, the pool is at app.connection().pool
-            conn = app.connection_for_read()
-            pool = (
-                conn.default_channel.client.connection_pool
-                if hasattr(conn.default_channel.client, "connection_pool")
-                else None
+            # Method 1: Monitor the broker connection pool
+            # Get a connection from Celery's pool
+            with app.pool.acquire(block=True) as conn:
+                # Access the underlying Redis connection pool
+                if hasattr(conn, "default_channel"):
+                    channel = conn.default_channel
+                    if hasattr(channel, "client") and hasattr(
+                        channel.client, "connection_pool"
+                    ):
+                        pool = channel.client.connection_pool
+
+                        # Track broker pool
+                        max_conn = pool.max_connections
+                        created = pool._created_connections
+                        available = len(pool._available_connections)
+                        in_use = created - available
+
+                        redis_pool_size.labels(
+                            pool_type="broker", worker=WORKER_NAME
+                        ).set(max_conn)
+                        redis_pool_available.labels(
+                            pool_type="broker", worker=WORKER_NAME
+                        ).set(available)
+                        redis_pool_in_use.labels(
+                            pool_type="broker", worker=WORKER_NAME
+                        ).set(in_use)
+
+                        print(
+                            f"📊 Broker Pool: {in_use}/{max_conn} in use, {available} available, {created} created"
+                        )
+
+            # Method 2: Monitor task-created connections (your application connections)
+            # This requires tracking via Redis INFO command
+            r = redis.from_url("redis://redis:6379/0")
+            info = r.info("clients")
+            connected_clients = info.get("connected_clients", 0)
+
+            # Also get queue depth
+            queue_depth = r.llen("celery")
+            celery_task_queue_depth.labels(queue_name="celery", worker=WORKER_NAME).set(
+                queue_depth
             )
 
-            if pool:
-                # For redis-py connection pool
-                if hasattr(pool, "_available_connections"):
-                    # Redis-py 4.x structure
-                    available = len(pool._available_connections)
-                    in_use = (
-                        len(pool._in_use_connections)
-                        if hasattr(pool, "_in_use_connections")
-                        else 0
-                    )
-                    pool_limit = pool.max_connections
-                elif hasattr(pool, "pool"):
-                    # Older structure or Kombu pool
-                    available = pool.pool.qsize() if hasattr(pool.pool, "qsize") else 0
-                    pool_limit = getattr(pool, "limit", 10)
-                    in_use = max(0, pool_limit - available)
-                else:
-                    # Fallback - try to get from Kombu pool
-                    pool_limit = getattr(pool, "limit", 10)
-                    available = 0
-                    in_use = 0
+            r.close()
 
-                celery_broker_pool_size.labels(worker=WORKER_NAME).set(pool_limit)
-                celery_broker_pool_available.labels(worker=WORKER_NAME).set(available)
-                celery_broker_pool_in_use.labels(worker=WORKER_NAME).set(in_use)
-
-                print(
-                    f"📊 Broker Pool: {in_use}/{pool_limit} in use, {available} available"
-                )
-            else:
-                print("⚠️ Could not access broker pool")
+            if queue_depth > 0:
+                print(f"📬 Queue: {queue_depth} tasks waiting")
 
         except Exception as e:
             print(f"⚠️ Error monitoring pools: {e}")
@@ -113,6 +130,13 @@ def monitor_celery_pools():
             traceback.print_exc()
 
         gevent.sleep(5)
+
+
+# Track broker operations
+@before_task_publish.connect
+def track_task_publish(sender=None, **kwargs):
+    """Track when tasks are published"""
+    celery_broker_operations.labels(operation="publish", worker=WORKER_NAME).inc()
 
 
 class PrometheusServerStep(bootsteps.StartStopStep):
@@ -125,31 +149,31 @@ class PrometheusServerStep(bootsteps.StartStopStep):
 
     def __init__(self, worker, **kwargs):
         self.server = None
+        self.pool_monitor = None
         super().__init__(worker, **kwargs)
 
     def start(self, worker):
         print("🚀 Bootstep: initializing Prometheus metrics server...")
         try:
-            # Create the WSGI app (No threading involved)
-            app = make_wsgi_app()
+            # Create the WSGI app
+            metrics_app = make_wsgi_app()
 
             # Bind the server to 0.0.0.0:8000
-            # log=None quiets the access logs
-            self.server = WSGIServer(("0.0.0.0", 8000), app, log=None)
+            self.server = WSGIServer(("0.0.0.0", 8000), metrics_app, log=None)
 
             # Start listening (Non-blocking in Gevent)
             self.server.start()
             print("📊 Metrics Server listening on 0.0.0.0:8000")
+
             # Start pool monitoring greenlet
-            print("🔍 Starting Celery pool monitoring greenlet...")
-            self.pool_monitor = spawn(monitor_celery_pools)
+            print("🔍 Starting Redis pool monitoring greenlet...")
+            self.pool_monitor = spawn(monitor_redis_pools)
             print("✅ Pool monitoring started")
 
         except Exception as e:
             print(f"❌ Failed to start metrics bootstep: {e}")
 
     def stop(self, worker):
-        # Clean shutdown when worker exits
         if self.server:
             print("🛑 Stopping metrics server...")
             self.server.stop()
@@ -202,7 +226,7 @@ def task_with_extra_connections(self, task_id, operations=10):
                     }
                 ),
             )
-            gevent.sleep(0.5)  # Use gevent.sleep instead of time.sleep
+            gevent.sleep(0.5)
 
         gevent.sleep(random.uniform(1, 10))  # Simulate processing
 
@@ -244,12 +268,14 @@ def task_with_extra_connections(self, task_id, operations=10):
 
         raise
     finally:
+        # ✅ CRITICAL: Decrement the gauge when task finishes
         tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
+
         # Clean up connections (but damage is done)
         for r in connections:
             try:
                 r.close()
-            except Exception as _e:
+            except Exception:
                 pass
 
 
@@ -271,14 +297,10 @@ def task_with_broker_pool_contention(self, task_id, subtasks=20):
         # Spawn many subtasks (each needs broker connection)
         job = []
         for i in range(subtasks):
-            # Each .apply_async() grabs a connection from Celery's pool
-            result = worker_task.apply_async(
-                args=[task_id, i],
-                countdown=0,  # Execute immediately
-            )
+            result = worker_task.apply_async(args=[task_id, i], countdown=0)
             job.append(result)
 
-        # Wait for all subtasks (holds connections)
+        # Wait for all subtasks
         results = [r.get(timeout=30) for r in job]
 
         # Record success
@@ -339,7 +361,7 @@ def worker_task(self, parent_id, step_id):
 
         return {"step": step_id, "status": "completed"}
 
-    except Exception as _e:
+    except Exception as e:
         duration = time.time() - start_time
         task_counter.labels(
             task_name=task_name, status="failure", worker=WORKER_NAME

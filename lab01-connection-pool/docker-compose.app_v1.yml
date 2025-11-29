@@ -16,7 +16,7 @@ services:
       - "8000-8010:8000"
     volumes:
       - ./app:/app
-    command: celery -A tasks_redis_exhaustion worker --loglevel=info --concurrency=10
+    command: celery -A tasks_redis_exhaustion worker --loglevel=info --pool=gevent --concurrency=400
     networks:
       - lab01-network
 
