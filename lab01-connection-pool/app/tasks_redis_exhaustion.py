@@ -6,9 +6,8 @@ monkey.patch_all()
 
 from celery import Celery, bootsteps
 from celery.signals import (
-    worker_process_init,
-    worker_process_shutdown,
     before_task_publish,
+    after_task_publish,
 )
 import time
 import random
@@ -18,6 +17,7 @@ from prometheus_client import Counter, Histogram, Gauge, make_wsgi_app
 import os
 import socket
 import gevent
+from threading import Lock
 
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
@@ -66,6 +66,58 @@ redis_pool_available = Gauge(
 redis_pool_in_use = Gauge(
     "redis_pool_in_use", "In-use connections in Redis pool", ["pool_type", "worker"]
 )
+# Add metric
+# NEW: Publish duration metric
+celery_publish_duration = Histogram(
+    "celery_publish_duration_seconds",
+    "Time to publish task to broker (indicates pool contention)",
+    ["worker"],
+    buckets=[0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0],
+)
+
+celery_publish_total = Counter(
+    "celery_publish_total", "Total tasks published", ["worker"]
+)
+
+# Track publish timing
+publish_times = {}
+publish_lock = Lock()
+
+
+@before_task_publish.connect
+def track_publish_start(sender=None, headers=None, body=None, **kwargs):
+    """Track when task publishing starts"""
+    task_id = headers.get("id") if headers else None
+    if task_id:
+        with publish_lock:
+            publish_times[task_id] = time.time()
+
+
+@after_task_publish.connect
+def track_publish_end(sender=None, headers=None, body=None, **kwargs):
+    """Track when task publishing completes - measure pool wait time"""
+    task_id = headers.get("id") if headers else None
+    if task_id:
+        end_time = time.time()
+        with publish_lock:
+            start_time = publish_times.pop(task_id, None)
+
+            if start_time:
+                duration = end_time - start_time
+
+                # Record in Prometheus
+                celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
+                celery_publish_total.labels(worker=WORKER_NAME).inc()
+
+                # Log slow publishes (indicates pool contention)
+                if duration > 0.1:
+                    print(
+                        f"⚠️  Slow publish: task took {duration:.3f}s to publish (pool contention!)"
+                    )
+                elif duration > 1.0:
+                    print(
+                        f"🔴 CRITICAL: task took {duration:.3f}s to publish (severe pool exhaustion!)"
+                    )
 
 
 def monitor_redis_pools():
@@ -130,13 +182,6 @@ def monitor_redis_pools():
             traceback.print_exc()
 
         gevent.sleep(5)
-
-
-# Track broker operations
-@before_task_publish.connect
-def track_task_publish(sender=None, **kwargs):
-    """Track when tasks are published"""
-    celery_broker_operations.labels(operation="publish", worker=WORKER_NAME).inc()
 
 
 class PrometheusServerStep(bootsteps.StartStopStep):
