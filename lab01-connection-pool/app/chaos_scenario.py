@@ -2,9 +2,7 @@ from collections import deque
 from click import echo, command, argument, Choice
 from tasks_redis_exhaustion import (
     task_with_extra_connections,
-    task_with_result_backend_pressure,
-    task_with_streaming_results,
-    blocking_task,
+    task_with_broker_pool_contention,
 )
 from metrics import (
     get_container_id_via_hostname,
@@ -279,140 +277,54 @@ def scenario_2_managed_pool_degradation(num_tasks=100):
     echo("  All tasks compete for 2 connection!\n")
 
 
-def scenario_3_result_backend_pressure(num_tasks=180):
-    """
-    Tasks store 5MB results each
-    Result backend pool = 1 connection
-    = Massive bottleneck
-    """
-    print_header("SCENARIO 2: Result Backend Exhaustion")
-
-    echo("📊 Each task stores 5MB result")
-    echo("  Result backend pool: 1 connection")
-    echo("  All tasks compete for 1 connection!\n")
-
-    echo(f"🚀 Submitting {num_tasks} tasks...\n")
-
-    job = group(
-        task_with_result_backend_pressure.s(task_id=i, result_size_mb=5)
-        for i in range(num_tasks)
-    )
-
-    start = time.time()
-    result = job.apply_async()
-
-    echo("⏳ Watching result backend saturation...\n")
-
-    try:
-        poll_start = time.time()
-        while not result.ready() and (time.time() - poll_start) < 120:
-            ready_count = sum(1 for r in result.results if r.ready())
-            echo(f"  Progress: {ready_count}/{num_tasks}\n")
-            time.sleep(2)
-
-        duration = time.time() - start
-        successful = sum(1 for r in result.results if r.successful())
-
-        echo(f"\n\n✓ Completed: {successful}/{num_tasks} in {duration:.1f}s")
-        echo(f"  Average: {duration / num_tasks:.1f}s per task")
-
-        if duration > 150:
-            echo("\n⚠️  Very slow - result backend bottleneck likely!")
-
-    except Exception as e:
-        echo(f"\n❌ Failed: {e}")
-
-
-def scenario_4_streaming_updates():
-    """
-    Tasks that update state 20 times
-    Each update = result backend write
-    = Connection churn
-    """
-    print_header("SCENARIO 3: Streaming Updates Overload")
-
-    echo("📊 Each task sends 20 progress updates")
-    echo("  20 updates × 50 tasks = 1000 result backend writes")
-    echo("  Pool size: 1 connection\n")
-
-    echo("🚀 Submitting 50 tasks...\n")
-
-    job = group(task_with_streaming_results.s(task_id=i, updates=20) for i in range(50))
-
-    start = time.time()
-    result = job.apply_async()
-
-    try:
-        result.get(timeout=120)
-        duration = time.time() - start
-        echo(f"\n✓ Completed in {duration:.1f}s")
-    except Exception as e:
-        duration = time.time() - start
-        echo(f"\n❌ Failed after {duration:.1f}s: {e}")
-
-
-def scenario_5_mixed_load():
-    """
-    Combination: blocking tasks + connection-heavy tasks
-    = Complete chaos
-    """
-    print_header("SCENARIO 4: Mixed Chaos Load")
-
-    echo("📊 Mix of:")
-    echo("  - 10 blocking tasks (10s each, hold connections)")
-    echo("  - 40 connection-heavy tasks (10 connections each)")
-    echo("  - 30 result backend pressure tasks")
-    echo("  Total: 80 tasks competing for pool of 1!\n")
-
-    echo("🚀 Submitting mixed workload...\n")
-
-    blocking = group(
-        blocking_task.s(task_id=f"block-{i}", duration=10) for i in range(10)
-    )
-
-    connection_heavy = group(
-        task_with_extra_connections.s(task_id=f"conn-{i}", operations=10)
-        for i in range(40)
-    )
-
-    result_heavy = group(
-        task_with_result_backend_pressure.s(task_id=f"result-{i}", result_size_mb=3)
-        for i in range(30)
-    )
-
-    _start = time.time()
-
-    # Submit all at once
-    r1 = blocking.apply_async()
-    r2 = connection_heavy.apply_async()
-    r3 = result_heavy.apply_async()
-
-    echo("⏳ Maximum chaos in progress...\n")
-
-    try:
-        time.sleep(60)  # Let it run for a minute
-
-        b_done = sum(1 for r in r1.results if r.ready())
-        c_done = sum(1 for r in r2.results if r.ready())
-        r_done = sum(1 for r in r3.results if r.ready())
-
-        echo("\n📊 After 60s:")
-        echo(f"  Blocking tasks: {b_done}/10")
-        echo(f"  Connection tasks: {c_done}/40")
-        echo(f"  Result tasks: {r_done}/30")
-        echo(f"  Total: {b_done + c_done + r_done}/80")
-
-    except Exception as e:
-        echo(f"\n❌ {e}")
+# def scenario_3_result_backend_pressure(num_tasks=180):
+#     """
+#     Tasks store 5MB results each
+#     Result backend pool = 1 connection
+#     = Massive bottleneck
+#     """
+#     print_header("SCENARIO 2: Result Backend Exhaustion")
+#
+#     echo("📊 Each task stores 5MB result")
+#     echo("  Result backend pool: 1 connection")
+#     echo("  All tasks compete for 1 connection!\n")
+#
+#     echo(f"🚀 Submitting {num_tasks} tasks...\n")
+#
+#     job = group(
+#         task_with_result_backend_pressure.s(task_id=i, result_size_mb=5)
+#         for i in range(num_tasks)
+#     )
+#
+#     start = time.time()
+#     result = job.apply_async()
+#
+#     echo("⏳ Watching result backend saturation...\n")
+#
+#     try:
+#         poll_start = time.time()
+#         while not result.ready() and (time.time() - poll_start) < 120:
+#             ready_count = sum(1 for r in result.results if r.ready())
+#             echo(f"  Progress: {ready_count}/{num_tasks}\n")
+#             time.sleep(2)
+#
+#         duration = time.time() - start
+#         successful = sum(1 for r in result.results if r.successful())
+#
+#         echo(f"\n\n✓ Completed: {successful}/{num_tasks} in {duration:.1f}s")
+#         echo(f"  Average: {duration / num_tasks:.1f}s per task")
+#
+#         if duration > 150:
+#             echo("\n⚠️  Very slow - result backend bottleneck likely!")
+#
+#     except Exception as e:
+#         echo(f"\n❌ Failed: {e}")
 
 
 # Map scenario numbers to the actual functions
 SCENARIOS = {
     "1": scenario_1_connection_explosion,
     "2": scenario_2_managed_pool_degradation,
-    "3": scenario_3_result_backend_pressure,
-    "4": scenario_4_streaming_updates,
-    "5": scenario_5_mixed_load,
 }
 
 
@@ -422,13 +334,10 @@ def cli(scenario):
     """
     Runs one of four defined test scenarios.
 
-    SCENARIO must be '1', '2', '3', or '4'. Defaults to '1'.
+    SCENARIO must be '1', '2',  or '3'. Defaults to '1'.
 
     1: Connection explosion (tasks open many connections)
     2: Connection explosion on the managed pool
-    3: Result backend pressure (large results)
-    4: Streaming updates (many small writes)
-    5: Mixed chaos (combination of all)
     """
     echo(f"Selected scenario: {scenario}\n")
 

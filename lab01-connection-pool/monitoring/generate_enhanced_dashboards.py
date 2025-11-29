@@ -240,6 +240,134 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
+            # Panel 11: Celery Broker Pool Usage
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 11,
+                "title": "🔌 Celery Broker Pool Usage",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_size",
+                        "legendFormat": "Pool Size (Total)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_in_use",
+                        "legendFormat": "Connections In Use",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_available",
+                        "legendFormat": "Connections Available",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "axisLabel": "Connections",
+                            "fillOpacity": 15,
+                            "lineWidth": 2,
+                            "drawStyle": "line",
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connections In Use",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                }
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connections Available",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "green", "mode": "fixed"},
+                                }
+                            ],
+                        },
+                    ],
+                },
+            },
+            # Panel 12: Broker Pool Saturation Gauge
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 12,
+                "title": "Broker Pool Saturation",
+                "type": "gauge",
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 40},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_in_use / celery_broker_pool_size * 100",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 50},
+                                {"color": "orange", "value": 80},
+                                {"color": "red", "value": 95},
+                            ],
+                        },
+                    }
+                },
+                "options": {
+                    "showThresholdLabels": True,
+                    "showThresholdMarkers": True,
+                },
+            },
+            # Panel 13: Pool Availability Stat
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 13,
+                "title": "Available Pool Connections",
+                "type": "stat",
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 40},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_available",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "red", "value": 0},
+                                {"color": "yellow", "value": 2},
+                                {"color": "green", "value": 5},
+                            ]
+                        },
+                    }
+                },
+                "options": {"colorMode": "background", "graphMode": "area"},
+            },
             # NEW Panel 7: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},

@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+import gevent
 from gevent import monkey, spawn
 from gevent.pywsgi import WSGIServer  # Import the Native Gevent Server
 
@@ -7,13 +9,11 @@ monkey.patch_all()
 from celery import Celery, bootsteps
 
 # Start metrics when worker initializes
-from celery.signals import worker_process_init, worker_process_shutdown
 import time
 import random
 import redis
 import json
 from prometheus_client import Counter, Histogram, Gauge, make_wsgi_app
-import threading
 import os
 import socket
 
@@ -42,6 +42,78 @@ tasks_in_progress = Gauge(
     ["task_name", "worker"],
 )
 
+# Add new metrics for Celery's broker pool
+celery_broker_pool_size = Gauge(
+    "celery_broker_pool_size", "Celery broker connection pool size", ["worker"]
+)
+
+celery_broker_pool_available = Gauge(
+    "celery_broker_pool_available", "Available connections in broker pool", ["worker"]
+)
+
+celery_broker_pool_in_use = Gauge(
+    "celery_broker_pool_in_use",
+    "Connections currently in use from broker pool",
+    ["worker"],
+)
+
+
+def monitor_celery_pools():
+    """
+    Gevent greenlet to monitor Celery's internal connection pools.
+    This runs continuously and updates Prometheus metrics.
+    """
+    while True:
+        try:
+            # Access the connection pool from the broker connection
+            # For Redis broker, the pool is at app.connection().pool
+            conn = app.connection_for_read()
+            pool = (
+                conn.default_channel.client.connection_pool
+                if hasattr(conn.default_channel.client, "connection_pool")
+                else None
+            )
+
+            if pool:
+                # For redis-py connection pool
+                if hasattr(pool, "_available_connections"):
+                    # Redis-py 4.x structure
+                    available = len(pool._available_connections)
+                    in_use = (
+                        len(pool._in_use_connections)
+                        if hasattr(pool, "_in_use_connections")
+                        else 0
+                    )
+                    pool_limit = pool.max_connections
+                elif hasattr(pool, "pool"):
+                    # Older structure or Kombu pool
+                    available = pool.pool.qsize() if hasattr(pool.pool, "qsize") else 0
+                    pool_limit = getattr(pool, "limit", 10)
+                    in_use = max(0, pool_limit - available)
+                else:
+                    # Fallback - try to get from Kombu pool
+                    pool_limit = getattr(pool, "limit", 10)
+                    available = 0
+                    in_use = 0
+
+                celery_broker_pool_size.labels(worker=WORKER_NAME).set(pool_limit)
+                celery_broker_pool_available.labels(worker=WORKER_NAME).set(available)
+                celery_broker_pool_in_use.labels(worker=WORKER_NAME).set(in_use)
+
+                print(
+                    f"📊 Broker Pool: {in_use}/{pool_limit} in use, {available} available"
+                )
+            else:
+                print("⚠️ Could not access broker pool")
+
+        except Exception as e:
+            print(f"⚠️ Error monitoring pools: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+        gevent.sleep(5)
+
 
 class PrometheusServerStep(bootsteps.StartStopStep):
     """
@@ -68,6 +140,10 @@ class PrometheusServerStep(bootsteps.StartStopStep):
             # Start listening (Non-blocking in Gevent)
             self.server.start()
             print("📊 Metrics Server listening on 0.0.0.0:8000")
+            # Start pool monitoring greenlet
+            print("🔍 Starting Celery pool monitoring greenlet...")
+            self.pool_monitor = spawn(monitor_celery_pools)
+            print("✅ Pool monitoring started")
 
         except Exception as e:
             print(f"❌ Failed to start metrics bootstep: {e}")
@@ -77,6 +153,10 @@ class PrometheusServerStep(bootsteps.StartStopStep):
         if self.server:
             print("🛑 Stopping metrics server...")
             self.server.stop()
+
+        if self.pool_monitor:
+            print("🛑 Stopping pool monitor...")
+            self.pool_monitor.kill()
 
 
 # Register the bootstep with the worker
@@ -122,9 +202,9 @@ def task_with_extra_connections(self, task_id, operations=10):
                     }
                 ),
             )
-            time.sleep(0.5)
+            gevent.sleep(0.5)  # Use gevent.sleep instead of time.sleep
 
-        time.sleep(random.uniform(1, 10))  # Simulate processing
+        gevent.sleep(random.uniform(1, 10))  # Simulate processing
 
         # Record success
         duration = time.time() - start_time
@@ -174,66 +254,98 @@ def task_with_extra_connections(self, task_id, operations=10):
 
 
 @app.task(bind=True)
-def task_with_result_backend_pressure(self, task_id, result_size_mb=5):
+def task_with_broker_pool_contention(self, task_id, subtasks=20):
     """
-    Store large results - exhausts result backend connections
+    This task spawns many subtasks, exhausting Celery's broker pool.
+    Each subtask needs a broker connection to be sent/received.
     """
-    print(f"Task {task_id} generating {result_size_mb}MB result")
+    print(f"Task {task_id} spawning {subtasks} subtasks - will exhaust broker pool")
 
-    # Generate large result
-    large_data = {
-        "task_id": task_id,
-        "predictions": [random.random() for _ in range(result_size_mb * 100000)],
-        "metadata": {"model": "test-model", "version": "1.0", "timestamp": time.time()},
-    }
+    task_name = "task_with_broker_pool_contention"
 
-    time.sleep(1)  # Simulate processing
+    # Track task start
+    tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).inc()
+    start_time = time.time()
 
-    # This stores to result backend (uses connection from pool)
-    return large_data
-
-
-@app.task(bind=True)
-def task_with_streaming_results(self, task_id, updates=20):
-    """
-    Tasks that update state multiple times (each uses connection)
-    """
-    print(f"Task {task_id} will send {updates} progress updates")
-
-    for i in range(updates):
-        # Each update uses a result backend connection
-        self.update_state(
-            state="PROGRESS",
-            meta={
-                "current": i,
-                "total": updates,
-                "status": f"Processing step {i + 1}/{updates}",
-            },
-        )
-        time.sleep(0.2)  # Work while connection might be held
-
-    return {"task_id": task_id, "updates": updates}
-
-
-@app.task(bind=True)
-def blocking_task(self, task_id, duration=10):
-    """
-    Long-running task that holds connections
-    """
-    print(f"Task {task_id} blocking for {duration}s")
-
-    # Hold connection for entire duration
-    r = get_redis()
-
-    duration = time.sleep(
-        random.uniform(1, 50)
-    )  # Simulate work while holding connection
     try:
-        # Set a key and hold the connection
-        r.set(f"blocking:{task_id}", "locked")
-        time.sleep(duration)
-        r.delete(f"blocking:{task_id}")
+        # Spawn many subtasks (each needs broker connection)
+        job = []
+        for i in range(subtasks):
+            # Each .apply_async() grabs a connection from Celery's pool
+            result = worker_task.apply_async(
+                args=[task_id, i],
+                countdown=0,  # Execute immediately
+            )
+            job.append(result)
 
-        return {"task_id": task_id, "duration": duration}
+        # Wait for all subtasks (holds connections)
+        results = [r.get(timeout=30) for r in job]
+
+        # Record success
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="success", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
+        print(f"Task {task_id} completed with {len(results)} subtasks")
+        return {
+            "task_id": task_id,
+            "subtasks": len(results),
+            "worker": WORKER_NAME,
+            "duration": duration,
+        }
+
+    except Exception as e:
+        print(f"Task {task_id} FAILED: {e}")
+
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="failure", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
+        raise
+
     finally:
+        tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
+
+
+@app.task(bind=True)
+def worker_task(self, parent_id, step_id):
+    """
+    Simple worker task that does minimal work.
+    The contention comes from having MANY of these.
+    """
+    task_name = "worker_task"
+
+    tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).inc()
+    start_time = time.time()
+
+    try:
+        # Simulate some work
+        gevent.sleep(random.uniform(1, 3))
+
+        # Maybe touch Redis (adds to contention)
+        r = get_redis()
+        r.set(f"subtask:{parent_id}:{step_id}", "completed")
         r.close()
+
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="success", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+
+        return {"step": step_id, "status": "completed"}
+
+    except Exception as _e:
+        duration = time.time() - start_time
+        task_counter.labels(
+            task_name=task_name, status="failure", worker=WORKER_NAME
+        ).inc()
+        task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
+        raise
+
+    finally:
+        tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
