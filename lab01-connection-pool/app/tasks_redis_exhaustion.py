@@ -162,7 +162,7 @@ def monitor_redis_pools():
             # This requires tracking via Redis INFO command
             r = redis.from_url("redis://redis:6379/0")
             info = r.info("clients")
-            connected_clients = info.get("connected_clients", 0)
+            _connected_clients = info.get("connected_clients", 0)
 
             # Also get queue depth
             queue_depth = r.llen("celery")
@@ -406,7 +406,7 @@ def worker_task(self, parent_id, step_id):
 
         return {"step": step_id, "status": "completed"}
 
-    except Exception as e:
+    except Exception as _e:
         duration = time.time() - start_time
         task_counter.labels(
             task_name=task_name, status="failure", worker=WORKER_NAME

@@ -304,7 +304,7 @@ def create_connection_exhaustion_dashboard():
                     ],
                 },
             },
-            # Panel 12: Broker Pool Saturation
+            # Panel 12: Broker Pool Saturation (FIXED QUERY)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 12,
@@ -314,7 +314,8 @@ def create_connection_exhaustion_dashboard():
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_in_use{pool_type='broker'} / redis_pool_size{pool_type='broker'} * 100",
+                        # FIX: Use sum() to aggregate across workers
+                        "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
                         "refId": "A",
                     }
                 ],
