@@ -250,8 +250,7 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
-            # TODO:
-            # NEW Panel 7: Task Duration (P50, P95, P99)
+            # Panel 7: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 7,
@@ -931,10 +930,48 @@ def create_connection_exhaustion_dashboard():
                     ],
                 },
             },
-            # Panel 19: Broker Pool Pressure Indicator (MOST USEFUL)
+            # Panel 19: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 19,
+                "title": "Task Duration Percentiles",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 66},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.50, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P50 (median)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P95",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.99, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P99",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "s",
+                        "custom": {
+                            "axisLabel": "Duration (seconds)",
+                            "fillOpacity": 10,
+                            "lineWidth": 2,
+                        },
+                    }
+                },
+            },
+            # Panel 20: Broker Pool Pressure Indicator (MOST USEFUL)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 20,
                 "title": "🔥 Broker Pool Pressure",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 66},
@@ -975,10 +1012,10 @@ def create_connection_exhaustion_dashboard():
                     "text": {"titleSize": 14, "valueSize": 32},
                 },
             },
-            # Panel 20: Result Get Duration (Shows Blocking)
+            # Panel 21: Result Get Duration (Shows Blocking)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 20,
+                "id": 21,
                 "title": "⏱️ Result Get Duration (Pool Blocking Indicator)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 74},
@@ -1031,6 +1068,213 @@ def create_connection_exhaustion_dashboard():
                             ],
                         },
                     ],
+                },
+            },
+            # ============================================================
+            # SCENARIO 2 SUMMARY STATISTICS (FIXED LAYOUT)
+            # ============================================================
+            {
+                "type": "row",
+                "id": 110,
+                "title": "📊 Scenario 2 Summary - Broker Pool Contention Impact",
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": 74},
+                "collapsed": False,
+            },
+            # P95 Publish Time (THE KEY METRIC - Move to front!)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 21,
+                "title": "P95 Publish Time",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 0, "y": 75},  # First position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": 0},  # 0-10ms: Normal
+                                {"color": "yellow", "value": 10},  # 10-50ms: Warning
+                                {"color": "orange", "value": 50},  # 50-100ms: Problem
+                                {"color": "red", "value": 100},  # 100ms+: Critical
+                            ]
+                        },
+                        "unit": "ms",
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
+            # Queue Depth (THE SYMPTOM)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 22,
+                "title": "Queue Depth",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 4, "y": 75},  # Second position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_task_queue_depth{queue_name='celery'}",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 1000},
+                                {"color": "orange", "value": 10000},
+                                {"color": "red", "value": 50000},
+                            ]
+                        },
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
+            # Avg Publish Duration (Alternative view)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 23,
+                "title": "Avg Publish Time",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 8, "y": 75},  # Third position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "rate(celery_publish_duration_seconds_sum[1m]) / rate(celery_publish_duration_seconds_count[1m]) * 1000",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 5},
+                                {"color": "orange", "value": 20},
+                                {"color": "red", "value": 50},
+                            ]
+                        },
+                        "unit": "ms",
+                        "decimals": 1,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
+            # Total Tasks Published
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 24,
+                "title": "Total Published",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 12, "y": 84},  # Fourth position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_publish_total)",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "blue", "value": 0}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
+            # Publish Failures
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 25,
+                "title": "Publish Failures",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 16, "y": 84},  # Fifth position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_publish_failed_total)",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "red", "value": 1},
+                            ]
+                        },
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
+            # Publish Rate (tasks/min)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 26,
+                "title": "Publish Rate",
+                "type": "stat",
+                "gridPos": {"h": 5, "w": 4, "x": 20, "y": 84},  # Sixth position
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(rate(celery_publish_total[1m])) * 60",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "yellow", "value": 0}]},
+                        "unit": "cpm",
+                        "decimals": 1,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
                 },
             },
         ],
