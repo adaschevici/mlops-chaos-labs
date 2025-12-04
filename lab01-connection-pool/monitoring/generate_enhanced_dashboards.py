@@ -252,130 +252,6 @@ def create_connection_exhaustion_dashboard():
             },
             # TODO:
             # Panel 11: Redis Broker Pool Usage
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 11,
-                "title": "🔌 Redis Broker Pool (Celery-Managed)",
-                "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_size{pool_type='broker'}",
-                        "legendFormat": "Pool Max Size",
-                        "refId": "A",
-                    },
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_in_use{pool_type='broker'}",
-                        "legendFormat": "Connections In Use",
-                        "refId": "B",
-                    },
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_available{pool_type='broker'}",
-                        "legendFormat": "Connections Available",
-                        "refId": "C",
-                    },
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "color": {"mode": "palette-classic"},
-                        "custom": {
-                            "axisLabel": "Connections",
-                            "fillOpacity": 15,
-                            "lineWidth": 2,
-                        },
-                    },
-                    "overrides": [
-                        {
-                            "matcher": {
-                                "id": "byName",
-                                "options": "Connections In Use",
-                            },
-                            "properties": [
-                                {
-                                    "id": "color",
-                                    "value": {"fixedColor": "orange", "mode": "fixed"},
-                                },
-                            ],
-                        },
-                        {
-                            "matcher": {
-                                "id": "byName",
-                                "options": "Connections Available",
-                            },
-                            "properties": [
-                                {
-                                    "id": "color",
-                                    "value": {"fixedColor": "green", "mode": "fixed"},
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-            # Panel 12: Broker Pool Saturation (FIXED QUERY)
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 12,
-                "title": "Broker Pool Saturation",
-                "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 41},
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        # FIX: Use sum() to aggregate across workers
-                        "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
-                        "refId": "A",
-                    }
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "unit": "percent",
-                        "min": 0,
-                        "max": 100,
-                        "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                {"color": "green", "value": 0},
-                                {"color": "yellow", "value": 50},
-                                {"color": "orange", "value": 80},
-                                {"color": "red", "value": 95},
-                            ],
-                        },
-                    }
-                },
-                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
-            },
-            # Panel 13: Queue Depth
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 13,
-                "title": "Task Queue Depth",
-                "type": "stat",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 41},
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_task_queue_depth{queue_name='celery'}",
-                        "refId": "A",
-                    }
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "color": {"mode": "thresholds"},
-                        "thresholds": {
-                            "steps": [
-                                {"color": "green", "value": 0},
-                                {"color": "yellow", "value": 100},
-                                {"color": "red", "value": 500},
-                            ]
-                        },
-                    }
-                },
-                "options": {"colorMode": "background", "graphMode": "area"},
-            },
             # NEW Panel 7: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -568,6 +444,130 @@ def create_connection_exhaustion_dashboard():
                     },
                 ],
                 "transformations": [{"id": "merge", "options": {}}],
+            },
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 11,
+                "title": "🔌 Redis Broker Pool (Celery-Managed)",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "redis_pool_size{pool_type='broker'}",
+                        "legendFormat": "Pool Max Size",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "redis_pool_in_use{pool_type='broker'}",
+                        "legendFormat": "Connections In Use",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "redis_pool_available{pool_type='broker'}",
+                        "legendFormat": "Connections Available",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "axisLabel": "Connections",
+                            "fillOpacity": 15,
+                            "lineWidth": 2,
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connections In Use",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connections Available",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "green", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+            # Panel 12: Broker Pool Saturation (FIXED QUERY)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 12,
+                "title": "Broker Pool Saturation",
+                "type": "gauge",
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 41},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        # FIX: Use sum() to aggregate across workers
+                        "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 50},
+                                {"color": "orange", "value": 80},
+                                {"color": "red", "value": 95},
+                            ],
+                        },
+                    }
+                },
+                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
+            },
+            # Panel 13: Queue Depth
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 13,
+                "title": "Task Queue Depth",
+                "type": "stat",
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 41},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_task_queue_depth{queue_name='celery'}",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 100},
+                                {"color": "red", "value": 500},
+                            ]
+                        },
+                    }
+                },
+                "options": {"colorMode": "background", "graphMode": "area"},
             },
             # Panel 14: Task Publish Duration (Shows Broker Pool Contention)
             {
