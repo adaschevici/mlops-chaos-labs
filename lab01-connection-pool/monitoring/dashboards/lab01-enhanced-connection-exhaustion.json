@@ -18,6 +18,18 @@
   "fiscalYearStartMonth": 0,
   "panels": [
     {
+      "type": "row",
+      "id": 100,
+      "title": "\ud83d\udd34 REDIS CONNECTION POOL - Root Cause Zone",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -29,7 +41,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -78,7 +90,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -135,7 +147,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -180,7 +192,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 9
       },
       "targets": [
         {
@@ -269,7 +281,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 8
+        "y": 9
       },
       "targets": [
         {
@@ -333,7 +345,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 8
+        "y": 9
       },
       "targets": [
         {
@@ -385,7 +397,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 40
+        "y": 41
       },
       "targets": [
         {
@@ -473,7 +485,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 40
+        "y": 41
       },
       "targets": [
         {
@@ -481,7 +493,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "redis_pool_in_use{pool_type='broker'} / redis_pool_size{pool_type='broker'} * 100",
+          "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
           "refId": "A"
         }
       ],
@@ -530,7 +542,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 40
+        "y": 41
       },
       "targets": [
         {
@@ -582,7 +594,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 17
       },
       "targets": [
         {
@@ -636,7 +648,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 17
       },
       "targets": [
         {
@@ -691,7 +703,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 25
       },
       "targets": [
         {
@@ -786,7 +798,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 35
       },
       "targets": [
         {
@@ -864,7 +876,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 49
       },
       "targets": [
         {
@@ -956,7 +968,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 48
+        "y": 49
       },
       "targets": [
         {
@@ -992,7 +1004,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 48
+        "y": 49
       },
       "targets": [
         {
@@ -1035,6 +1047,355 @@
       "options": {
         "showThresholdLabels": true,
         "showThresholdMarkers": true
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 17,
+      "title": "\ud83d\udd0d SMOKING GUN: Queue Backup vs Publish Slowdown",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "celery_task_queue_depth{queue_name='celery'}",
+          "legendFormat": "Queue Depth (tasks)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "Publish P95 Duration (ms)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 3,
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Queue Depth (tasks)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Publish P95 Duration (ms)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 18,
+      "title": "\ud83d\udce4 Publish Success vs Failures",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 65
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(celery_publish_total[30s])",
+          "legendFormat": "Successful Publishes/sec",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(celery_publish_failed_total[30s])",
+          "legendFormat": "Failed Publishes/sec",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(celery_publish_connection_errors_total[30s])",
+          "legendFormat": "Connection Errors/sec",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed Publishes/sec"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Connection Errors/sec"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 19,
+      "title": "\ud83d\udd25 Broker Pool Pressure",
+      "type": "gauge",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 65
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "max": 1000,
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 32
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 20,
+      "title": "\u23f1\ufe0f Result Get Duration (Pool Blocking Indicator)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 73
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum(rate(celery_result_get_duration_seconds_bucket{status='success'}[1m])) by (le))",
+          "legendFormat": "P50 (successful)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(celery_result_get_duration_seconds_bucket{status='success'}[1m])) by (le))",
+          "legendFormat": "P95 (successful)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum(rate(celery_result_get_duration_seconds_bucket{status='timeout'}[1m])) by (le))",
+          "legendFormat": "P50 (timeout)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "axisLabel": "Get Duration (seconds)",
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 45
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P50 (timeout)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       }
     }
   ]

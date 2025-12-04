@@ -270,7 +270,7 @@ def scenario_1_connection_explosion(num_tasks=1800):
         traceback.print_exc()
 
 
-def scenario_2_managed_pool_degradation(num_parent_tasks=100, subtasks_per_parent=50):
+def scenario_2_managed_pool_degradation(num_parent_tasks=200, subtasks_per_parent=100):
     """
     SCENARIO 2: Celery Broker Pool Exhaustion
 
@@ -635,6 +635,280 @@ def get_queue_depth(queue_name="celery"):
         return 0
 
 
+def scenario_2_broker_pool_contention(num_parent_tasks=300, subtasks_per_parent=200):
+    """
+    Enhanced to show publishing slowdown in real-time
+    """
+    print_header("SCENARIO 2: Broker Pool Exhaustion")
+    hostname = get_container_id_via_hostname()
+
+    total_tasks = num_parent_tasks * subtasks_per_parent
+
+    echo("📊 Setup:")
+    echo(f"  Parent tasks: {num_parent_tasks}")
+    echo(f"  Subtasks per parent: {subtasks_per_parent}")
+    echo(f"  Total subtasks: {total_tasks}")
+    echo("  Broker pool limit: Check celeryconfig\n")
+
+    # Submit parent tasks
+    job = group(
+        task_with_broker_pool_contention.s(
+            task_id=f"parent-{i}", subtasks=subtasks_per_parent
+        )
+        for i in range(num_parent_tasks)
+    )
+
+    start = time.time()
+    result = job.apply_async()
+
+    echo("⏳ Monitoring broker pool contention...\n")
+
+    # Tracking
+    timeout = 60 * 15
+    poll_start = time.time()
+    last_ready = 0
+    last_check_time = poll_start
+
+    # NEW: Track publishing metrics
+    last_publish_count = 0
+    publish_rate_history = deque(maxlen=10)
+    _last_publish_duration = 0
+    max_publish_duration = 0
+
+    try:
+        while (time.time() - poll_start) < timeout:
+            current_time = time.time()
+            elapsed = current_time - start
+
+            # Get task states
+            ready, successful, failed, pending, errors = get_task_states(result)
+
+            # Get metrics from Prometheus
+            queue_depth = get_queue_depth()
+
+            # NEW: Get publish metrics
+            # In your scenario monitoring loop:
+            publish_metrics = get_publish_metrics()
+            if publish_metrics:
+                current_publish_count = publish_metrics.get("total_publishes", 0)
+                publish_failures = publish_metrics.get("total_failures", 0)
+                connection_errors = publish_metrics.get("connection_errors", 0)
+                current_publish_p95 = publish_metrics.get("p95_duration", 0)
+                current_publish_p99 = publish_metrics.get("p99_duration", 0)
+
+                #
+                # Calculate success rate
+                total_attempts = current_publish_count + publish_failures
+                success_rate = (
+                    (current_publish_count / total_attempts * 100)
+                    if total_attempts > 0
+                    else 0
+                )
+
+                # Calculate publish rate
+                time_since_last = current_time - last_check_time
+                if time_since_last > 0:
+                    publishes_since_last = current_publish_count - last_publish_count
+                    publish_rate = publishes_since_last / time_since_last
+                    publish_rate_history.append(publish_rate)
+                else:
+                    publish_rate = 0
+
+                avg_publish_rate = (
+                    sum(publish_rate_history) / len(publish_rate_history)
+                    if publish_rate_history
+                    else 0
+                )
+
+                # Track max publish duration
+                max_publish_duration = max(max_publish_duration, current_publish_p99)
+
+                last_publish_count = current_publish_count
+                _last_publish_duration = current_publish_p95
+            else:
+                success_rate = 0
+                publish_rate = 0
+                current_publish_count = 0
+                publish_failures = 0
+                connection_errors = 0
+                avg_publish_rate = 0
+                current_publish_p95 = 0
+                current_publish_p99 = 0
+
+            # Calculate task completion rate
+            time_since_last_check = current_time - last_check_time
+            tasks_completed = ready - last_ready
+            completion_rate = (
+                tasks_completed / time_since_last_check
+                if time_since_last_check > 0
+                else 0
+            )
+
+            # Print progress with publishing metrics
+            echo(f"Container ID: {hostname}                         ")
+            echo(f"Queue Depth: {queue_depth:5d} tasks waiting     ")
+
+            # Show publishing status with failures
+            if connection_errors > 0:
+                publish_status = "🔴 FAILING"
+            elif current_publish_p95 > 1.0:
+                publish_status = "🔴 CRITICAL"
+            elif current_publish_p95 > 0.1:
+                publish_status = "🟡 Slow"
+            else:
+                publish_status = "🟢 Normal"
+            echo(f"Publishing: {publish_status}")
+            echo(f"  ├─ Success Rate: {success_rate:.1f}%")
+            echo(f"  ├─ Successful: {current_publish_count}")
+            echo(f"  ├─ Failed: {publish_failures}")
+            echo(f"  ├─ Connection Errors: {connection_errors}")
+            echo(
+                f"  ├─ Rate: {publish_rate:.1f} pub/s (instant) | {avg_publish_rate:.1f} pub/s (avg)"
+            )
+            echo(f"  ├─ P95 Duration: {current_publish_p95 * 1000:.1f}ms")
+            echo(f"  └─ P99 Duration: {current_publish_p99 * 1000:.1f}ms")
+
+            # Alert on connection errors
+            if connection_errors > 10:
+                echo("           🔴🔴🔴 REDIS CONNECTION EXHAUSTION!")
+                echo(
+                    f"               {connection_errors} failed publishes due to ConnectionError"
+                )
+                echo(
+                    "               Workers cannot get Redis connections to publish subtasks!"
+                )
+            echo(
+                f"[{elapsed:6.1f}s] "
+                f"Parents: {ready:4d}/{num_parent_tasks} | "
+                f"Success: {successful:4d} | "
+                f"Failed: {failed:4d} | "
+                f"Pending: {pending:4d}"
+            )
+            echo(f"           Completion Rate: {completion_rate:.1f} tasks/s")
+
+            echo(
+                f"  Publish P95: {print_publish_status_bar(current_publish_p95 * 1000)}"
+            )
+            # NEW: Detect publishing slowdown
+            if current_publish_p95 > 1.0:
+                echo(
+                    f"           🔴 PUBLISH SLOWDOWN: P95={current_publish_p95:.2f}s (broker pool exhausted!)"
+                )
+            elif current_publish_p95 > 0.5:
+                echo(
+                    f"           🟡 Publish degradation: P95={current_publish_p95:.2f}s"
+                )
+
+            # Detect queue backup WITH publishing correlation
+            if queue_depth > 1000:
+                echo(f"           🔴 QUEUE BACKUP: {queue_depth} tasks")
+                if current_publish_p95 > 0.1:
+                    echo(
+                        f"              ↳ Cause: Slow publishing (P95={current_publish_p95 * 1000:.0f}ms)"
+                    )
+
+            # Check completion
+            if ready >= num_parent_tasks:
+                echo("\n✓ All parent tasks completed")
+                break
+
+            last_ready = ready
+            last_check_time = current_time
+            time.sleep(2)
+
+        # Final statistics
+        duration = time.time() - start
+        ready, successful, failed, pending, errors = get_task_states(result)
+
+        echo("\n" + "=" * 70)
+        echo(f"📈 FINAL RESULTS after {duration:.1f}s:")
+        echo(f"   Parents completed: {ready}/{num_parent_tasks}")
+        echo(f"   Overall throughput: {ready / duration:.2f} tasks/sec")
+
+        # Publishing statistics
+        final_publish_metrics = get_publish_metrics()
+        if final_publish_metrics:
+            echo("\n📤 PUBLISHING PERFORMANCE:")
+            echo(
+                f"   Total publishes: {final_publish_metrics.get('total_publishes', 0)}"
+            )
+            echo(
+                f"   Average publish rate: {final_publish_metrics.get('total_publishes', 0) / duration:.1f} pub/s"
+            )
+            echo(f"   Peak P95 duration: {max_publish_duration * 1000:.1f}ms")
+            echo(
+                f"   Final P95 duration: {final_publish_metrics.get('p95_duration', 0) * 1000:.1f}ms"
+            )
+
+            if max_publish_duration > 1.0:
+                echo("   ❌ SEVERE PUBLISHING SLOWDOWN DETECTED!")
+                echo("      Peak publish time: {max_publish_duration:.2f}s")
+                echo("      This proves broker pool exhaustion!")
+
+        echo("=" * 70)
+
+    except KeyboardInterrupt:
+        echo("\n⏸  Interrupted")
+    except Exception as e:
+        echo(f"\n❌ Exception: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+def print_publish_status_bar(p95_ms, max_width=50):
+    """
+    Visual bar showing publishing performance
+    Green (0-100ms) | Yellow (100-500ms) | Red (500ms+)
+    """
+    if p95_ms < 100:
+        color = "🟢"
+        filled = int((p95_ms / 100) * max_width)
+    elif p95_ms < 500:
+        color = "🟡"
+        filled = int(((p95_ms - 100) / 400) * max_width)
+    else:
+        color = "🔴"
+        filled = min(max_width, int(((p95_ms - 500) / 1000) * max_width))
+
+    bar = "█" * filled + "░" * (max_width - filled)
+    return f"{color} [{bar}] {p95_ms:.0f}ms"
+
+
+def get_publish_metrics():
+    """
+    Query Prometheus for task publishing metrics INCLUDING FAILURES.
+    """
+    try:
+        import requests
+
+        queries = {
+            "total_publishes": "sum(celery_publish_total)",
+            "total_failures": "sum(celery_publish_failed_total)",
+            "connection_errors": "sum(celery_publish_connection_errors_total)",
+            "p95_duration": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le))",
+            "p99_duration": "histogram_quantile(0.99, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le))",
+        }
+
+        results = {}
+        for key, query in queries.items():
+            resp = requests.get(
+                "http://prometheus:9090/api/v1/query",
+                params={"query": query},
+                timeout=2,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data["data"]["result"]:
+                    value = float(data["data"]["result"][0]["value"][1])
+                    results[key] = value
+
+        return results if results else None
+
+    except Exception:
+        return None
+
+
 # def scenario_3_result_backend_pressure(num_tasks=180):
 #     """
 #     Tasks store 5MB results each
@@ -682,7 +956,7 @@ def get_queue_depth(queue_name="celery"):
 # Map scenario numbers to the actual functions
 SCENARIOS = {
     "1": scenario_1_connection_explosion,
-    "2": scenario_2_managed_pool_degradation,
+    "2": scenario_2_broker_pool_contention,
 }
 
 
@@ -695,7 +969,8 @@ def cli(scenario):
     SCENARIO must be '1', '2',  or '3'. Defaults to '1'.
 
     1: Connection explosion (tasks open many connections)
-    2: Connection explosion on the managed pool
+    2: Connection explosion on the managed pool causing contention and increased duration of task execution
+    3: Connection explosion on the managed pool
     """
     echo(f"Selected scenario: {scenario}\n")
 

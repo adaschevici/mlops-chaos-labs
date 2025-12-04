@@ -4,7 +4,7 @@ from gevent.pywsgi import WSGIServer
 
 monkey.patch_all()
 
-from celery import Celery, bootsteps
+from celery import Celery, bootsteps, Task
 from celery.signals import (
     before_task_publish,
     after_task_publish,
@@ -21,6 +21,52 @@ from threading import Lock
 
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
+
+
+class InstrumentedTask(Task):
+    """Custom task class that tracks publish failures"""
+
+    def apply_async(self, args=None, kwargs=None, **options):
+        """Override apply_async to track publishing"""
+        start_time = time.time()
+
+        try:
+            # Try to publish
+            result = super().apply_async(args=args, kwargs=kwargs, **options)
+
+            # Track successful publish duration
+            duration = time.time() - start_time
+            celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
+            celery_publish_total.labels(worker=WORKER_NAME).inc()
+
+            if duration > 1.0:
+                print(f"🔴 Slow publish: {duration:.3f}s")
+
+            return result
+
+        except redis.exceptions.ConnectionError as _e:
+            # Track connection error
+            duration = time.time() - start_time
+            celery_publish_connection_errors.labels(worker=WORKER_NAME).inc()
+            celery_publish_failed.labels(
+                worker=WORKER_NAME, error_type="ConnectionError"
+            ).inc()
+
+            print(f"🔴🔴🔴 PUBLISH FAILED: ConnectionError after {duration:.3f}s")
+            print("           Cannot get Redis connection to publish task!")
+            raise
+
+        except Exception as e:
+            # Track other errors
+            duration = time.time() - start_time
+            error_type = type(e).__name__
+            celery_publish_failed.labels(
+                worker=WORKER_NAME, error_type=error_type
+            ).inc()
+
+            print(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
+            raise
+
 
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
@@ -79,6 +125,24 @@ celery_publish_total = Counter(
     "celery_publish_total", "Total tasks published", ["worker"]
 )
 
+# Add new metrics for publish failures
+celery_publish_failed = Counter(
+    "celery_publish_failed_total", "Failed task publishes", ["worker", "error_type"]
+)
+
+celery_publish_connection_errors = Counter(
+    "celery_publish_connection_errors_total",
+    "Connection errors during publish",
+    ["worker"],
+)
+
+celery_result_get_duration = Histogram(
+    "celery_result_get_duration_seconds",
+    "Time waiting for task results (indicates pool blocking)",
+    ["worker", "status"],
+    buckets=[0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0],
+)
+
 # Track publish timing
 publish_times = {}
 publish_lock = Lock()
@@ -109,15 +173,19 @@ def track_publish_end(sender=None, headers=None, body=None, **kwargs):
                 celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
                 celery_publish_total.labels(worker=WORKER_NAME).inc()
 
-                # Log slow publishes (indicates pool contention)
-                if duration > 0.1:
+                # Enhanced logging with visual indicators
+                if duration > 5.0:
                     print(
-                        f"⚠️  Slow publish: task took {duration:.3f}s to publish (pool contention!)"
+                        f"🔴🔴🔴 CRITICAL PUBLISH DELAY: {duration:.3f}s - BROKER POOL EXHAUSTED!"
                     )
                 elif duration > 1.0:
                     print(
-                        f"🔴 CRITICAL: task took {duration:.3f}s to publish (severe pool exhaustion!)"
+                        f"🔴 SEVERE: Publish took {duration:.3f}s (broker pool contention)"
                     )
+                elif duration > 0.5:
+                    print(f"🟡 WARNING: Publish took {duration:.3f}s (pool pressure)")
+                elif duration > 0.1:
+                    print(f"⚠️  Slow publish: {duration:.3f}s")
 
 
 def monitor_redis_pools():
@@ -238,7 +306,7 @@ def get_redis():
     return redis.from_url("redis://redis:6379/0")
 
 
-@app.task(bind=True)
+@app.task(bind=True, base=InstrumentedTask)
 def task_with_extra_connections(self, task_id, operations=10):
     """
     This task opens additional Redis connections
@@ -324,29 +392,78 @@ def task_with_extra_connections(self, task_id, operations=10):
                 pass
 
 
-@app.task(bind=True)
-def task_with_broker_pool_contention(self, task_id, subtasks=20):
+@app.task(bind=True, base=InstrumentedTask)
+def task_with_broker_pool_contention(self, task_id, subtasks=50):
     """
-    This task spawns many subtasks, exhausting Celery's broker pool.
-    Each subtask needs a broker connection to be sent/received.
+    This task spawns subtasks, stressing Celery's broker pool.
     """
-    print(f"Task {task_id} spawning {subtasks} subtasks - will exhaust broker pool")
+    print(f"📤 Task {task_id} spawning {subtasks} subtasks - will exhaust broker pool")
 
     task_name = "task_with_broker_pool_contention"
-
-    # Track task start
     tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).inc()
     start_time = time.time()
 
     try:
-        # Spawn many subtasks (each needs broker connection)
-        job = []
-        for i in range(subtasks):
-            result = worker_task.apply_async(args=[task_id, i], countdown=0)
-            job.append(result)
+        # Spawn many subtasks
+        jobs = []
+        publish_start = time.time()
 
-        # Wait for all subtasks
-        results = [r.get(timeout=30) for r in job]
+        for i in range(subtasks):
+            job_start = time.time()
+            result = worker_task.apply_async(args=[task_id, i], countdown=0)
+            job_duration = time.time() - job_start
+
+            # Log slow publishes
+            if job_duration > 0.5:
+                print(
+                    f"⚠️  Slow subtask publish #{i}: {job_duration:.2f}s (pool contention!)"
+                )
+
+            jobs.append(result)
+
+        publish_duration = time.time() - publish_start
+        print(
+            f"✅ Published {subtasks} subtasks in {publish_duration:.2f}s (avg {publish_duration / subtasks:.3f}s each)"
+        )
+
+        # CRITICAL: Wait for results
+        print(f"⏳ Waiting for {len(jobs)} subtask results (timeout=60s each)...")
+        results = []
+        get_start = time.time()
+
+        for i, job in enumerate(jobs):
+            try:
+                result_start = time.time()
+                result = job.get(timeout=60)  # Increased timeout
+                result_duration = time.time() - result_start
+
+                celery_result_get_duration.labels(
+                    worker=WORKER_NAME, status="success"
+                ).observe(result_duration)
+                if result_duration > 5.0:
+                    print(
+                        f"🐌 Subtask #{i} took {result_duration:.1f}s to return (slow!)"
+                    )
+
+                results.append(result)
+
+                # Show progress every 10 subtasks
+                if (i + 1) % 10 == 0:
+                    print(f"   Progress: {i + 1}/{len(jobs)} subtasks completed")
+
+            except Exception as e:
+                get_duration = time.time() - result_start
+                print(
+                    f"❌ Subtask #{i} FAILED after {get_duration:.1f}s: {type(e).__name__}: {e}"
+                )
+                celery_result_get_duration.labels(
+                    worker=WORKER_NAME, status="timeout"
+                ).observe(result_duration)
+                raise
+                # Continue trying other subtasks instead of failing immediately
+
+        get_duration = time.time() - get_start
+        print(f"✅ Collected {len(results)}/{len(jobs)} results in {get_duration:.2f}s")
 
         # Record success
         duration = time.time() - start_time
@@ -355,30 +472,36 @@ def task_with_broker_pool_contention(self, task_id, subtasks=20):
         ).inc()
         task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
 
-        print(f"Task {task_id} completed with {len(results)} subtasks")
+        success_rate = len(results) / len(jobs) * 100
+        print(
+            f"🎯 Task {task_id} completed: {len(results)}/{len(jobs)} subtasks ({success_rate:.0f}%) in {duration:.1f}s total"
+        )
+
         return {
             "task_id": task_id,
-            "subtasks": len(results),
+            "subtasks_spawned": len(jobs),
+            "subtasks_completed": len(results),
+            "success_rate": success_rate,
             "worker": WORKER_NAME,
             "duration": duration,
+            "publish_duration": publish_duration,
+            "get_duration": get_duration,
         }
 
     except Exception as e:
-        print(f"Task {task_id} FAILED: {e}")
-
+        print(f"💥 Task {task_id} CATASTROPHIC FAILURE: {e}")
         duration = time.time() - start_time
         task_counter.labels(
             task_name=task_name, status="failure", worker=WORKER_NAME
         ).inc()
         task_duration.labels(task_name=task_name, worker=WORKER_NAME).observe(duration)
-
         raise
 
     finally:
         tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
 
 
-@app.task(bind=True)
+@app.task(bind=True, base=InstrumentedTask)
 def worker_task(self, parent_id, step_id):
     """
     Simple worker task that does minimal work.

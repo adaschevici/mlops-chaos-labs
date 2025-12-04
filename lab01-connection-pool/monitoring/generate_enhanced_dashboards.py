@@ -19,13 +19,23 @@ def create_connection_exhaustion_dashboard():
         "timepicker": {},
         "fiscalYearStartMonth": 0,
         "panels": [
-            # Panel 1: Connection Pool Usage (existing)
+            # ============================================================
+            # SCENARIO 1: APPLICATION-LEVEL REDIS CONNECTION EXHAUSTION
+            # ============================================================
+            {
+                "type": "row",
+                "id": 100,
+                "title": "🔴 SCENARIO 1: Redis Connection Pool Exhaustion (Application-Level)",
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+                "collapsed": False,
+            },
+            # Panel 1: Connection Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 1,
                 "title": "Connection Pool Usage",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -53,13 +63,13 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
             },
-            # Panel 2: Usage % Gauge (existing)
+            # Panel 2: Usage % Gauge
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 2,
                 "title": "Connection Pool Usage %",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -85,13 +95,13 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
             },
-            # Panel 3: Rejected Connections (existing)
+            # Panel 3: Rejected Connections
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 3,
                 "title": "Rejected Connections",
                 "type": "stat",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -111,13 +121,13 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
-            # NEW Panel 4: Task Throughput (Tasks/sec)
+            # Panel 4: Task Throughput (Tasks/sec)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 4,
                 "title": "⚡ Task Throughput (Tasks/sec)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -174,14 +184,14 @@ def create_connection_exhaustion_dashboard():
                 },
             },
             # ------------------------------------------------------------------
-            # UPDATED Panel 5: Current Task Rate Gauge (REVERSED LOGIC)
+            # Panel 5: Current Task Rate Gauge
             # ------------------------------------------------------------------
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 5,
                 "title": "Current Task Rate",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 9},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -212,13 +222,13 @@ def create_connection_exhaustion_dashboard():
                     "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
                 },
             },
-            # NEW Panel 6: Tasks In Progress
+            # Panel 6: Tasks In Progress
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 6,
                 "title": "Tasks In Progress",
                 "type": "stat",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 9},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -240,13 +250,14 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
+            # TODO:
             # Panel 11: Redis Broker Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 11,
                 "title": "🔌 Redis Broker Pool (Celery-Managed)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -310,7 +321,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 12,
                 "title": "Broker Pool Saturation",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 40},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 41},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -343,7 +354,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 13,
                 "title": "Task Queue Depth",
                 "type": "stat",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 40},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 41},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -371,7 +382,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 7,
                 "title": "Task Duration Percentiles",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -403,13 +414,13 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
             },
-            # NEW Panel 8: Success Rate %
+            # Panel 8: Success Rate %
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 8,
                 "title": "Task Success Rate",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+                "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -445,7 +456,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 9,
                 "title": "🔍 CRITICAL: Connection Usage vs Task Throughput",
                 "type": "timeseries",
-                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 24},
+                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 25},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -513,7 +524,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 10,
                 "title": "Summary Statistics",
                 "type": "table",
-                "gridPos": {"h": 6, "w": 24, "x": 0, "y": 34},
+                "gridPos": {"h": 6, "w": 24, "x": 0, "y": 35},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -564,7 +575,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 14,
                 "title": "⏱️ Task Publish Duration (Broker Pool Contention Indicator)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 49},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -622,7 +633,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 15,
                 "title": "Task Publish Rate",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 48},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 49},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -648,7 +659,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 16,
                 "title": "Current P95 Publish Time",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 48},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 49},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -673,6 +684,245 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
                 "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
+            },
+            # Panel 17: Queue Depth vs Publish Duration (THE KEY CORRELATION)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 17,
+                "title": "🔍 SMOKING GUN: Queue Backup vs Publish Slowdown",
+                "type": "timeseries",
+                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 57},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_task_queue_depth{queue_name='celery'}",
+                        "legendFormat": "Queue Depth (tasks)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+                        "legendFormat": "Publish P95 Duration (ms)",
+                        "refId": "B",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "fillOpacity": 20,
+                            "lineWidth": 3,
+                            "drawStyle": "line",
+                            "lineInterpolation": "smooth",
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Queue Depth (tasks)",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "red", "mode": "fixed"},
+                                },
+                                {"id": "custom.axisPlacement", "value": "left"},
+                                {"id": "unit", "value": "short"},
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Publish P95 Duration (ms)",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                },
+                                {"id": "custom.axisPlacement", "value": "right"},
+                                {"id": "unit", "value": "ms"},
+                            ],
+                        },
+                    ],
+                },
+                "options": {
+                    "legend": {
+                        "displayMode": "table",
+                        "placement": "bottom",
+                        "showLegend": True,
+                        "calcs": ["mean", "max", "lastNotNull"],
+                    }
+                },
+            },
+            # Panel 18: Publish Success vs Failures
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 18,
+                "title": "📤 Publish Success vs Failures",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 65},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "rate(celery_publish_total[30s])",
+                        "legendFormat": "Successful Publishes/sec",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "rate(celery_publish_failed_total[30s])",
+                        "legendFormat": "Failed Publishes/sec",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "rate(celery_publish_connection_errors_total[30s])",
+                        "legendFormat": "Connection Errors/sec",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "fillOpacity": 20,
+                            "lineWidth": 2,
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Failed Publishes/sec",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "red", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connection Errors/sec",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {
+                                        "fixedColor": "dark-red",
+                                        "mode": "fixed",
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+            # Panel 19: Broker Pool Pressure Indicator (MOST USEFUL)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 19,
+                "title": "🔥 Broker Pool Pressure",
+                "type": "gauge",
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 65},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        # Shows how long publishes are taking (higher = more contention)
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "ms",
+                        "min": 0,
+                        "max": 1000,  # 1 second
+                        "decimals": 0,
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "green", "value": 0},  # 0-10ms: Normal
+                                {
+                                    "color": "yellow",
+                                    "value": 10,
+                                },  # 10-50ms: Slight pressure
+                                {
+                                    "color": "orange",
+                                    "value": 50,
+                                },  # 50-100ms: Moderate pressure
+                                {"color": "red", "value": 100},  # 100ms+: High pressure
+                            ],
+                        },
+                    }
+                },
+                "options": {
+                    "showThresholdLabels": True,
+                    "showThresholdMarkers": True,
+                    "text": {"titleSize": 14, "valueSize": 32},
+                },
+            },
+            # Panel 20: Result Get Duration (Shows Blocking)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 20,
+                "title": "⏱️ Result Get Duration (Pool Blocking Indicator)",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 73},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.50, sum(rate(celery_result_get_duration_seconds_bucket{status='success'}[1m])) by (le))",
+                        "legendFormat": "P50 (successful)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_result_get_duration_seconds_bucket{status='success'}[1m])) by (le))",
+                        "legendFormat": "P95 (successful)",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.50, sum(rate(celery_result_get_duration_seconds_bucket{status='timeout'}[1m])) by (le))",
+                        "legendFormat": "P50 (timeout)",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "s",
+                        "custom": {
+                            "axisLabel": "Get Duration (seconds)",
+                            "fillOpacity": 15,
+                            "lineWidth": 2,
+                        },
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "green", "value": None},
+                                {"color": "yellow", "value": 5},
+                                {"color": "orange", "value": 20},
+                                {"color": "red", "value": 45},
+                            ],
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {"id": "byName", "options": "P50 (timeout)"},
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "red", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                    ],
+                },
             },
         ],
     }
