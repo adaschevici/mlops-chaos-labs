@@ -590,18 +590,30 @@
       }
     },
     {
+      "type": "row",
+      "id": 102,
+      "title": "\ud83d\udcca Summary Statistics",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "collapsed": false
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "id": 10,
-      "title": "Summary Statistics",
-      "type": "table",
+      "title": "Total Tasks",
+      "type": "stat",
       "gridPos": {
-        "h": 6,
-        "w": 24,
+        "h": 4,
+        "w": 5,
         "x": 0,
-        "y": 35
+        "y": 36
       },
       "targets": [
         {
@@ -610,62 +622,235 @@
             "uid": "prometheus"
           },
           "expr": "sum(celery_task_total)",
-          "legendFormat": "Total Tasks",
-          "refId": "A",
-          "instant": true,
-          "format": "table"
-        },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 11,
+      "title": "Successful Tasks",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 36
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "expr": "sum(celery_task_total{status='success'})",
-          "legendFormat": "Successful",
-          "refId": "B",
-          "instant": true,
-          "format": "table"
-        },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 12,
+      "title": "Failed Tasks",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 36
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "expr": "sum(celery_task_total{status='failure'})",
-          "legendFormat": "Failed",
-          "refId": "C",
-          "instant": true,
-          "format": "table"
-        },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 13,
+      "title": "Avg Rate (tasks/min)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 36
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "expr": "sum(rate(celery_task_total[5m])) * 60",
-          "legendFormat": "Avg Rate (tasks/min)",
-          "refId": "D",
-          "instant": true,
-          "format": "table"
-        },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 2,
+          "unit": "cpm"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 14,
+      "title": "Redis Connections",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 36
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "expr": "redis_connected_clients",
-          "legendFormat": "Current Connections",
-          "refId": "E",
-          "instant": true,
-          "format": "table"
+          "refId": "A"
         }
       ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "decimals": 0
         }
-      ]
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "type": "row",
+      "id": 101,
+      "title": "\ud83d\udd36 SCENARIO 2: Celery Broker Pool Contention (Application-Level)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "collapsed": false
     },
     {
       "datasource": {
@@ -679,7 +864,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 42
       },
       "targets": [
         {
@@ -767,7 +952,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 41
+        "y": 42
       },
       "targets": [
         {
@@ -824,7 +1009,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 41
+        "y": 42
       },
       "targets": [
         {
@@ -876,7 +1061,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 50
       },
       "targets": [
         {
@@ -968,7 +1153,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 49
+        "y": 50
       },
       "targets": [
         {
@@ -1004,7 +1189,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 49
+        "y": 50
       },
       "targets": [
         {
@@ -1061,7 +1246,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 58
       },
       "targets": [
         {
@@ -1169,7 +1354,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 65
+        "y": 66
       },
       "targets": [
         {
@@ -1256,7 +1441,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 65
+        "y": 66
       },
       "targets": [
         {
@@ -1318,7 +1503,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 74
       },
       "targets": [
         {

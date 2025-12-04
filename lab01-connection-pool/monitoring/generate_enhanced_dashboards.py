@@ -251,7 +251,6 @@ def create_connection_exhaustion_dashboard():
                 "options": {"colorMode": "background", "graphMode": "area"},
             },
             # TODO:
-            # Panel 11: Redis Broker Pool Usage
             # NEW Panel 7: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -394,63 +393,173 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
             },
-            # Panel 10: Summary Stats Table
+            # Better approach: Summary stats as stat panels in a row
+            {
+                "type": "row",
+                "id": 102,
+                "title": "📊 Summary Statistics",
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
+                "collapsed": False,
+            },
+            # Total Tasks
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 10,
-                "title": "Summary Statistics",
-                "type": "table",
-                "gridPos": {"h": 6, "w": 24, "x": 0, "y": 35},
+                "title": "Total Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 5, "x": 0, "y": 36},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "sum(celery_task_total)",
-                        "legendFormat": "Total Tasks",
                         "refId": "A",
-                        "instant": True,
-                        "format": "table",
-                    },
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "blue", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Successful Tasks
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 11,
+                "title": "Successful Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 5, "x": 5, "y": 36},
+                "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "sum(celery_task_total{status='success'})",
-                        "legendFormat": "Successful",
-                        "refId": "B",
-                        "instant": True,
-                        "format": "table",
-                    },
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "green", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Failed Tasks
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 12,
+                "title": "Failed Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 5, "x": 10, "y": 36},
+                "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "sum(celery_task_total{status='failure'})",
-                        "legendFormat": "Failed",
-                        "refId": "C",
-                        "instant": True,
-                        "format": "table",
-                    },
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "red", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Average Rate
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 13,
+                "title": "Avg Rate (tasks/min)",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 5, "x": 15, "y": 36},
+                "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "sum(rate(celery_task_total[5m])) * 60",
-                        "legendFormat": "Avg Rate (tasks/min)",
-                        "refId": "D",
-                        "instant": True,
-                        "format": "table",
-                    },
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "yellow", "value": None}]},
+                        "decimals": 2,
+                        "unit": "cpm",
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Current Connections
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 14,
+                "title": "Redis Connections",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 20, "y": 36},
+                "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "redis_connected_clients",
-                        "legendFormat": "Current Connections",
-                        "refId": "E",
-                        "instant": True,
-                        "format": "table",
-                    },
+                        "refId": "A",
+                    }
                 ],
-                "transformations": [{"id": "merge", "options": {}}],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": None},
+                                {"color": "yellow", "value": 50},
+                                {"color": "red", "value": 90},
+                            ]
+                        },
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                },
             },
+            # ============================================================
+            # SCENARIO 2: CELERY BROKER POOL CONTENTION
+            # ============================================================
+            {
+                "type": "row",
+                "id": 101,
+                "title": "🔶 SCENARIO 2: Celery Broker Pool Contention (Application-Level)",
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": 41},
+                "collapsed": False,
+            },
+            # Panel 11: Redis Broker Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 11,
                 "title": "🔌 Redis Broker Pool (Celery-Managed)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 42},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -514,7 +623,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 12,
                 "title": "Broker Pool Saturation",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 41},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 42},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -547,7 +656,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 13,
                 "title": "Task Queue Depth",
                 "type": "stat",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 41},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 42},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -575,7 +684,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 14,
                 "title": "⏱️ Task Publish Duration (Broker Pool Contention Indicator)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 49},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -633,7 +742,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 15,
                 "title": "Task Publish Rate",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 49},
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -659,7 +768,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 16,
                 "title": "Current P95 Publish Time",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 49},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -691,7 +800,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 17,
                 "title": "🔍 SMOKING GUN: Queue Backup vs Publish Slowdown",
                 "type": "timeseries",
-                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 57},
+                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 58},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -762,7 +871,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 18,
                 "title": "📤 Publish Success vs Failures",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 65},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 66},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -828,7 +937,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 19,
                 "title": "🔥 Broker Pool Pressure",
                 "type": "gauge",
-                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 65},
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 66},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -872,7 +981,7 @@ def create_connection_exhaustion_dashboard():
                 "id": 20,
                 "title": "⏱️ Result Get Duration (Pool Blocking Indicator)",
                 "type": "timeseries",
-                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 73},
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 74},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
