@@ -1,10 +1,9 @@
 # ruff: noqa: E402
-from gevent import monkey, spawn
-from gevent.pywsgi import WSGIServer
+from gevent import monkey
 
 monkey.patch_all()
 
-from celery import Celery, bootsteps, Task
+from celery import Celery, Task
 from celery.signals import (
     before_task_publish,
     after_task_publish,
@@ -13,7 +12,7 @@ import time
 import random
 import redis
 import json
-from prometheus_client import Counter, Histogram, Gauge, make_wsgi_app
+from prometheus_client import Counter, Histogram, Gauge
 import os
 import socket
 import gevent
@@ -348,64 +347,6 @@ def monitor_redis_pools():
             traceback.print_exc()
 
         gevent.sleep(5)
-
-
-class PrometheusServerStep(bootsteps.StartStopStep):
-    """
-    A custom Bootstep that launches the Prometheus server
-    when the Celery Worker starts.
-    """
-
-    requires = {"celery.worker.components:Timer"}
-
-    def __init__(self, worker, **kwargs):
-        self.server = None
-        self.pool_monitor = None
-        self.broker_pool_monitor = None
-        super().__init__(worker, **kwargs)
-
-    def start(self, worker):
-        print("🚀 Bootstep: initializing Prometheus metrics server...")
-        try:
-            # Create the WSGI app
-            metrics_app = make_wsgi_app()
-
-            # Bind the server to 0.0.0.0:8000
-            self.server = WSGIServer(("0.0.0.0", 8000), metrics_app, log=None)
-
-            # Start listening (Non-blocking in Gevent)
-            self.server.start()
-            print("📊 Metrics Server listening on 0.0.0.0:8000")
-
-            # Start pool monitoring greenlet
-            print("🔍 Starting Redis pool monitoring greenlet...")
-            self.pool_monitor = spawn(monitor_redis_pools)
-            print("✅ Pool monitoring started")
-
-            # Start broker pool saturation monitoring
-            print("🔍 Starting broker pool saturation monitoring...")
-            self.broker_pool_monitor = spawn(monitor_broker_pool_saturation)
-            print("✅ Broker pool monitoring started")
-
-        except Exception as e:
-            print(f"❌ Failed to start metrics bootstep: {e}")
-
-    def stop(self, worker):
-        if self.server:
-            print("🛑 Stopping metrics server...")
-            self.server.stop()
-
-        if self.pool_monitor:
-            print("🛑 Stopping pool monitor...")
-            self.pool_monitor.kill()
-
-        if self.broker_pool_monitor:
-            print("🛑 Stopping broker pool monitor...")
-            self.broker_pool_monitor.kill()
-
-
-# Register the bootstep with the worker
-app.steps["worker"].add(PrometheusServerStep)
 
 
 # Each task opens its OWN Redis connection (outside Celery's pool)
