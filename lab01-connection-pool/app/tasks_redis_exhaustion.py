@@ -28,10 +28,21 @@ class InstrumentedTask(Task):
 
     def apply_async(self, args=None, kwargs=None, **options):
         """Override apply_async to track publishing"""
+        global _concurrent_publishes_count
+
+        # Track that we're TRYING to publish
+        with _concurrent_publishes_lock:
+            _concurrent_publishes_count += 1
+            publish_queue_depth.labels(worker=WORKER_NAME).inc()
+            concurrent_publishes.labels(worker=WORKER_NAME).inc()
         start_time = time.time()
+
+        duration = None
 
         try:
             # Try to publish
+            result = super().apply_async(args=args, kwargs=kwargs, **options)
+            # This is where it blocks waiting for a pool connection!
             result = super().apply_async(args=args, kwargs=kwargs, **options)
 
             # Track successful publish duration
@@ -39,8 +50,17 @@ class InstrumentedTask(Task):
             celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
             celery_publish_total.labels(worker=WORKER_NAME).inc()
 
-            if duration > 1.0:
-                print(f"🔴 Slow publish: {duration:.3f}s")
+            # Log pool contention
+            if duration > 5.0:
+                print(
+                    f"🔴🔴🔴 CRITICAL POOL WAIT: {duration:.3f}s - BROKER POOL SATURATED!"
+                )
+            elif duration > 1.0:
+                print(
+                    f"🔴 Severe pool contention: {duration:.3f}s waiting for broker connection"
+                )
+            elif duration > 0.5:
+                print(f"🟡 Pool pressure: {duration:.3f}s")
 
             return result
 
@@ -66,7 +86,15 @@ class InstrumentedTask(Task):
 
             print(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
             raise
+        finally:
+            # Done with publish attempt
+            publish_queue_depth.labels(worker=WORKER_NAME).dec()
+            concurrent_publishes.labels(worker=WORKER_NAME).dec()
 
+
+# FIXED: Manual counter for tracking concurrent publishes
+_concurrent_publishes_count = 0
+_concurrent_publishes_lock = Lock()
 
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
@@ -142,7 +170,33 @@ celery_result_get_duration = Histogram(
     ["worker", "status"],
     buckets=[0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0],
 )
+celery_broker_pool_max = Gauge(
+    "celery_broker_pool_max",
+    "Maximum broker pool connections (from config)",
+    ["worker"],
+)
 
+celery_broker_pool_active = Gauge(
+    "celery_broker_pool_active", "Currently active broker pool connections", ["worker"]
+)
+
+celery_broker_pool_saturation = Gauge(
+    "celery_broker_pool_saturation_percent",
+    "Broker pool saturation percentage",
+    ["worker"],
+)
+
+# Track concurrent publishes (proxy for pool usage)
+concurrent_publishes = Gauge(
+    "celery_concurrent_publishes",
+    "Number of publishes happening concurrently",
+    ["worker"],
+)
+
+# Track publish queue (tasks waiting for pool connection)
+publish_queue_depth = Gauge(
+    "celery_publish_queue_depth", "Tasks waiting for broker pool connection", ["worker"]
+)
 # Track publish timing
 publish_times = {}
 publish_lock = Lock()
@@ -186,6 +240,51 @@ def track_publish_end(sender=None, headers=None, body=None, **kwargs):
                     print(f"🟡 WARNING: Publish took {duration:.3f}s (pool pressure)")
                 elif duration > 0.1:
                     print(f"⚠️  Slow publish: {duration:.3f}s")
+
+
+def monitor_broker_pool_saturation():
+    """
+    Monitor Celery's broker pool saturation.
+    The broker pool is what limits concurrent publishes.
+    """
+    while True:
+        try:
+            # Get broker_pool_limit from Celery config
+            broker_pool_limit = app.conf.get("broker_pool_limit", 10)  # Default is 10
+
+            # Set the max gauge
+            celery_broker_pool_max.labels(worker=WORKER_NAME).set(broker_pool_limit)
+
+            # Get current concurrent publishes as proxy for active connections
+            # This is a proxy because Celery doesn't expose pool._in_use directly
+            current_concurrent = concurrent_publishes._metrics.get(
+                (WORKER_NAME,), concurrent_publishes._metric_init()
+            )._value._value
+
+            celery_broker_pool_active.labels(worker=WORKER_NAME).set(current_concurrent)
+
+            # Calculate saturation
+            saturation = (
+                (current_concurrent / broker_pool_limit * 100)
+                if broker_pool_limit > 0
+                else 0
+            )
+            celery_broker_pool_saturation.labels(worker=WORKER_NAME).set(saturation)
+
+            # Log when saturated
+            if saturation >= 100:
+                print(
+                    f"🔴 BROKER POOL SATURATED: {current_concurrent}/{broker_pool_limit} ({saturation:.0f}%)"
+                )
+            elif saturation >= 80:
+                print(
+                    f"🟡 Broker pool pressure: {current_concurrent}/{broker_pool_limit} ({saturation:.0f}%)"
+                )
+
+        except Exception as e:
+            print(f"⚠️ Error monitoring broker pool: {e}")
+
+        gevent.sleep(1)  # Check every second
 
 
 def monitor_redis_pools():
@@ -263,6 +362,7 @@ class PrometheusServerStep(bootsteps.StartStopStep):
     def __init__(self, worker, **kwargs):
         self.server = None
         self.pool_monitor = None
+        self.broker_pool_monitor = None
         super().__init__(worker, **kwargs)
 
     def start(self, worker):
@@ -283,6 +383,11 @@ class PrometheusServerStep(bootsteps.StartStopStep):
             self.pool_monitor = spawn(monitor_redis_pools)
             print("✅ Pool monitoring started")
 
+            # Start broker pool saturation monitoring
+            print("🔍 Starting broker pool saturation monitoring...")
+            self.broker_pool_monitor = spawn(monitor_broker_pool_saturation)
+            print("✅ Broker pool monitoring started")
+
         except Exception as e:
             print(f"❌ Failed to start metrics bootstep: {e}")
 
@@ -294,6 +399,10 @@ class PrometheusServerStep(bootsteps.StartStopStep):
         if self.pool_monitor:
             print("🛑 Stopping pool monitor...")
             self.pool_monitor.kill()
+
+        if self.broker_pool_monitor:
+            print("🛑 Stopping broker pool monitor...")
+            self.broker_pool_monitor.kill()
 
 
 # Register the bootstep with the worker

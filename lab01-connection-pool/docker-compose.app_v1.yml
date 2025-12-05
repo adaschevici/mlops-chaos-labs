@@ -10,12 +10,14 @@ services:
     labels:
       - __meta_docker_container_label_com_docker_compose_service
     environment:
+      - PROMETHEUS_MULTIPROC_DIR=/var/prom/metrics
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     ports:
       - "8000-8010:8000"
     volumes:
       - ./app:/app
+      - prom_data:/var/prom/metrics
     command: celery -A tasks_redis_exhaustion worker --loglevel=info --pool=gevent --concurrency=400
     networks:
       - lab01-network
@@ -23,3 +25,6 @@ services:
 networks:
   lab01-network:
     driver: bridge
+
+volumes:
+  prom_data:

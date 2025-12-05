@@ -13,36 +13,9 @@ scrape_configs:
     static_configs:
       - targets: ['redis-exporter:9121']
   
-  - job_name: 'celery-workers'
-    docker_sd_configs:
-      - host: tcp://docker-proxy:2375 # Connect to the proxy service
-    
-    relabel_configs:
-      # --- RULE 1: FILTERING ---
-      # Only scrape containers that belong to the 'celery-worker' service.
-      # Docker Compose automatically adds this label to your containers.
-      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
-        regex: celery-worker
-        action: keep
-
-      # --- RULE 2: PORT FIXING ---
-      # Docker SD discovers ALL ports. If your container exposes 8000 (metrics) 
-      # AND 6379 (redis), Prometheus might try to scrape Redis.
-      # This rule forces the scrape address to always use port 8000.
-      - source_labels: [__address__]
-        regex: '(.*):.*'       # Capture just the IP address
-        replacement: '${1}:8000' # Append the correct metrics port
-        target_label: __address__
-
-      # --- RULE 3: RENAMING (The Magic Part) ---
-      # Docker names usually come as "/lab01-celery-worker-1".
-      # We strip the leading "/" and use this as the 'instance' label.
-      - source_labels: [__meta_docker_container_name]
-        regex: '/(.*)'         # Capture everything after the slash
-        replacement: '$1'      # Use the captured text
-        target_label: instance
-
-      # --- RULE 4: ADDING METADATA (Optional) ---
-      # It's often useful to keep the Docker Image version visible in Prometheus
-      - source_labels: [__meta_docker_container_image]
-        target_label: image
+  - job_name: 'celery-metrics-aggregated'
+    # Scrape interval might be 15s by default, but you might want faster for saturation
+    scrape_interval: 5s 
+    static_configs:
+      # Target the single, dedicated endpoint that serves the aggregated metrics
+      - targets: ['metrics-aggregator:8000']

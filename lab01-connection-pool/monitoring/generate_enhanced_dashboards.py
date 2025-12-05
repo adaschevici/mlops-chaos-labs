@@ -1080,17 +1080,18 @@ def create_connection_exhaustion_dashboard():
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 74},
                 "collapsed": False,
             },
-            # P95 Publish Time (THE KEY METRIC - Move to front!)
+            # Updated Panel for Broker Pool Saturation in Scenario 2 Summary
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
                 "id": 21,
-                "title": "P95 Publish Time",
+                "title": "Broker Pool Saturation",
                 "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 0, "y": 75},  # First position
+                "gridPos": {"h": 5, "w": 4, "x": 0, "y": 75},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
+                        # Use the new direct saturation metric
+                        "expr": "celery_broker_pool_saturation_percent",
                         "refId": "A",
                     }
                 ],
@@ -1099,84 +1100,16 @@ def create_connection_exhaustion_dashboard():
                         "color": {"mode": "thresholds"},
                         "thresholds": {
                             "steps": [
-                                {"color": "green", "value": 0},  # 0-10ms: Normal
-                                {"color": "yellow", "value": 10},  # 10-50ms: Warning
-                                {"color": "orange", "value": 50},  # 50-100ms: Problem
-                                {"color": "red", "value": 100},  # 100ms+: Critical
+                                {"color": "green", "value": 0},  # 0-50%: Healthy
+                                {"color": "yellow", "value": 50},  # 50-80%: Warning
+                                {
+                                    "color": "orange",
+                                    "value": 80,
+                                },  # 80-95%: High pressure
+                                {"color": "red", "value": 95},  # 95%+: Saturated
                             ]
                         },
-                        "unit": "ms",
-                        "decimals": 0,
-                    }
-                },
-                "options": {
-                    "colorMode": "background",
-                    "graphMode": "area",
-                    "textMode": "value_and_name",
-                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
-                },
-            },
-            # Queue Depth (THE SYMPTOM)
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 22,
-                "title": "Queue Depth",
-                "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 4, "y": 75},  # Second position
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_task_queue_depth{queue_name='celery'}",
-                        "refId": "A",
-                    }
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "color": {"mode": "thresholds"},
-                        "thresholds": {
-                            "steps": [
-                                {"color": "green", "value": 0},
-                                {"color": "yellow", "value": 1000},
-                                {"color": "orange", "value": 10000},
-                                {"color": "red", "value": 50000},
-                            ]
-                        },
-                        "decimals": 0,
-                    }
-                },
-                "options": {
-                    "colorMode": "background",
-                    "graphMode": "area",
-                    "textMode": "value_and_name",
-                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
-                },
-            },
-            # Avg Publish Duration (Alternative view)
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 23,
-                "title": "Avg Publish Time",
-                "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 8, "y": 75},  # Third position
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_publish_duration_seconds_sum[1m]) / rate(celery_publish_duration_seconds_count[1m]) * 1000",
-                        "refId": "A",
-                    }
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "color": {"mode": "thresholds"},
-                        "thresholds": {
-                            "steps": [
-                                {"color": "green", "value": 0},
-                                {"color": "yellow", "value": 5},
-                                {"color": "orange", "value": 20},
-                                {"color": "red", "value": 50},
-                            ]
-                        },
-                        "unit": "ms",
+                        "unit": "percent",
                         "decimals": 1,
                     }
                 },
@@ -1187,45 +1120,118 @@ def create_connection_exhaustion_dashboard():
                     "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
                 },
             },
-            # Total Tasks Published
+            # Also add a detailed broker pool panel in the main scenario section
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 24,
-                "title": "Total Published",
-                "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 12, "y": 84},  # Fourth position
+                "id": 27,
+                "title": "🔌 Celery Broker Pool Utilization",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(celery_publish_total)",
+                        "expr": "celery_broker_pool_max",
+                        "legendFormat": "Pool Max Size (Config Limit)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_active",
+                        "legendFormat": "Active Connections (In Use)",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_concurrent_publishes",
+                        "legendFormat": "Concurrent Publishes",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "axisLabel": "Connections",
+                            "fillOpacity": 15,
+                            "lineWidth": 2,
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Active Connections (In Use)",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Pool Max Size (Config Limit)",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "red", "mode": "fixed"},
+                                },
+                                {"id": "custom.fillOpacity", "value": 0},
+                                {
+                                    "id": "custom.lineStyle",
+                                    "value": {"dash": [10, 10], "fill": "dash"},
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+            # Broker Pool Saturation Gauge (for main section)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 28,
+                "title": "Broker Pool Saturation %",
+                "type": "gauge",
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 50},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "celery_broker_pool_saturation_percent",
                         "refId": "A",
                     }
                 ],
                 "fieldConfig": {
                     "defaults": {
-                        "color": {"mode": "thresholds"},
-                        "thresholds": {"steps": [{"color": "blue", "value": 0}]},
-                        "decimals": 0,
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "green", "value": 0},
+                                {"color": "yellow", "value": 50},
+                                {"color": "orange", "value": 80},
+                                {"color": "red", "value": 95},
+                            ],
+                        },
                     }
                 },
-                "options": {
-                    "colorMode": "background",
-                    "graphMode": "none",
-                    "textMode": "value_and_name",
-                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
-                },
+                "options": {"showThresholdLabels": True, "showThresholdMarkers": True},
             },
-            # Publish Failures
+            # Publish Queue Depth (tasks waiting for broker connection)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 25,
-                "title": "Publish Failures",
+                "id": 29,
+                "title": "Publish Queue (Waiting for Pool)",
                 "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 16, "y": 84},  # Fifth position
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(celery_publish_failed_total)",
+                        "expr": "celery_publish_queue_depth",
                         "refId": "A",
                     }
                 ],
@@ -1235,7 +1241,9 @@ def create_connection_exhaustion_dashboard():
                         "thresholds": {
                             "steps": [
                                 {"color": "green", "value": 0},
-                                {"color": "red", "value": 1},
+                                {"color": "yellow", "value": 10},
+                                {"color": "orange", "value": 50},
+                                {"color": "red", "value": 100},
                             ]
                         },
                         "decimals": 0,
@@ -1245,36 +1253,6 @@ def create_connection_exhaustion_dashboard():
                     "colorMode": "background",
                     "graphMode": "area",
                     "textMode": "value_and_name",
-                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
-                },
-            },
-            # Publish Rate (tasks/min)
-            {
-                "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 26,
-                "title": "Publish Rate",
-                "type": "stat",
-                "gridPos": {"h": 5, "w": 4, "x": 20, "y": 84},  # Sixth position
-                "targets": [
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(rate(celery_publish_total[1m])) * 60",
-                        "refId": "A",
-                    }
-                ],
-                "fieldConfig": {
-                    "defaults": {
-                        "color": {"mode": "thresholds"},
-                        "thresholds": {"steps": [{"color": "yellow", "value": 0}]},
-                        "unit": "cpm",
-                        "decimals": 1,
-                    }
-                },
-                "options": {
-                    "colorMode": "background",
-                    "graphMode": "area",
-                    "textMode": "value_and_name",
-                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
                 },
             },
         ],
