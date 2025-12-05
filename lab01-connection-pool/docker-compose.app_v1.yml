@@ -22,6 +22,7 @@ services:
     networks:
       - lab01-network
 
+
 networks:
   lab01-network:
     driver: bridge

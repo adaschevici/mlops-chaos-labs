@@ -18,4 +18,4 @@ scrape_configs:
     scrape_interval: 5s 
     static_configs:
       # Target the single, dedicated endpoint that serves the aggregated metrics
-      - targets: ['metrics-aggregator:8000']
+      - targets: ['prometheus-exporter:8000']

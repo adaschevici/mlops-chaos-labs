@@ -12,30 +12,6 @@ services:
     networks:
       - lab01-network
 
-  # The helper container
-  docker-proxy:
-    image: tecnativa/docker-socket-proxy
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro # Mount socket here instead
-    environment:
-      - CONTAINERS=1 # Allow listing containers
-      - NETWORKS=1
-    # only uncomment if you want to test from the host using curl
-    # curl -i http://localhost:2375/containers/json
-    # curl -i http://localhost:2375/networks
-    # ports:
-    #   - "127.0.0.1:2375:2375" # <--- Map to localhost only for security
-    networks:
-      - lab01-network
-    healthcheck:
-      # We check /containers/json because you enabled CONTAINERS=1.
-      # If we checked /version, it would fail (403 Forbidden) unless you added VERSION=1.
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2375/containers/json"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-
   prometheus:
     image: prom/prometheus:latest
     container_name: lab01-prometheus
@@ -55,6 +31,19 @@ services:
     networks:
       - lab01-network
   
+  # The service that scrapes/collects the metrics (optional, but a common pattern)
+  prometheus-exporter:
+    build: .
+    command: python /app/metrics_server.py # A simple server that calls prometheus_client.start_http_server
+    ports:
+      - "8000:8000"
+    environment:
+      # Must point to the SAME directory to read all the files
+      - PROMETHEUS_MULTIPROC_DIR=/var/prom/metrics
+    volumes:
+      # Must mount the SAME volume to aggregate all files
+      - prom_data:/var/prom/metrics
+
   grafana:
     image: grafana/grafana:latest
     container_name: lab01-grafana
@@ -76,6 +65,7 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  prom-data:
 
 networks:
   lab01-network:
