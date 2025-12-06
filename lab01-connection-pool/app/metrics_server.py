@@ -17,7 +17,7 @@ PROMETHEUS_MULTIPROC_DIR = os.environ.get(
     "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus_multiproc"
 )
 HOST = "0.0.0.0"
-PORT = 9090
+PORT = 9080
 # ---------------------
 
 app = FastAPI(

@@ -12,10 +12,14 @@ scrape_configs:
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
   
   - job_name: 'celery-metrics-aggregated'
     # Scrape interval might be 15s by default, but you might want faster for saturation
     scrape_interval: 5s 
     static_configs:
       # Target the single, dedicated endpoint that serves the aggregated metrics
-      - targets: ['prometheus-exporter:8000']
+      - targets: ['prometheus-exporter:9080']
+        labels:
+          service: 'celery-metrics-aggregated'

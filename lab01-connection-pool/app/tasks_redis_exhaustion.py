@@ -7,6 +7,8 @@ from celery import Celery, Task
 from celery.signals import (
     before_task_publish,
     after_task_publish,
+    worker_process_init,
+    worker_process_shutdown,
 )
 import time
 import random
@@ -18,11 +20,40 @@ import socket
 import gevent
 from threading import Lock
 
-app = Celery("chaos_lab")
-app.config_from_object("celeryconfig_redis")
 
+PROMETHEUS_MULTIPROC_DIR = os.environ.get(
+    "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc"
+)
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
+
+
+@worker_process_init.connect
+def setup_metrics(**kwargs):
+    """Clean metrics dir on worker start"""
+    # Clean up old metric files for this process
+    if os.path.exists(PROMETHEUS_MULTIPROC_DIR):
+        for f in os.listdir(PROMETHEUS_MULTIPROC_DIR):
+            if str(os.getpid()) in f:
+                try:
+                    os.remove(os.path.join(PROMETHEUS_MULTIPROC_DIR, f))
+                except Exception:
+                    pass
+    else:
+        os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
+
+    print(f"✅ Worker {os.getpid()} initialized metrics in {PROMETHEUS_MULTIPROC_DIR}")
+
+
+@worker_process_shutdown.connect
+def cleanup_metrics(**kwargs):
+    """Clean up metrics on worker shutdown"""
+    # Optionally clean up this process's metrics
+    print(f"🧹 Worker {os.getpid()} shutting down")
+
+
+app = Celery("chaos_lab")
+app.config_from_object("celeryconfig_redis")
 
 # Prometheus metrics
 task_counter = Counter(
@@ -40,11 +71,15 @@ tasks_in_progress = Gauge(
     "celery_tasks_in_progress",
     "Number of tasks currently executing",
     ["task_name", "worker"],
+    multiprocess_mode="livesum",
 )
 
 # Queue and broker metrics
 celery_task_queue_depth = Gauge(
-    "celery_task_queue_depth", "Tasks waiting in queue", ["queue_name", "worker"]
+    "celery_task_queue_depth",
+    "Tasks waiting in queue",
+    ["queue_name", "worker"],
+    multiprocess_mode="livesum",
 )
 
 celery_broker_operations = Counter(
@@ -53,20 +88,27 @@ celery_broker_operations = Counter(
 
 # Redis connection pool metrics (from redis-py directly)
 redis_pool_size = Gauge(
-    "redis_pool_size", "Redis connection pool max size", ["pool_type", "worker"]
+    "redis_pool_size",
+    "Redis connection pool max size",
+    ["pool_type", "worker"],
+    multiprocess_mode="liveall",
 )
 
 redis_pool_available = Gauge(
     "redis_pool_available",
     "Available connections in Redis pool",
     ["pool_type", "worker"],
+    multiprocess_mode="livesum",
 )
 
 redis_pool_in_use = Gauge(
-    "redis_pool_in_use", "In-use connections in Redis pool", ["pool_type", "worker"]
+    "redis_pool_in_use",
+    "In-use connections in Redis pool",
+    ["pool_type", "worker"],
+    multiprocess_mode="livesum",
 )
-# Add metric
-# NEW: Publish duration metric
+
+# Publish duration metric
 celery_publish_duration = Histogram(
     "celery_publish_duration_seconds",
     "Time to publish task to broker (indicates pool contention)",
@@ -99,16 +141,21 @@ celery_broker_pool_max = Gauge(
     "celery_broker_pool_max",
     "Maximum broker pool connections (from config)",
     ["worker"],
+    multiprocess_mode="liveall",
 )
 
 celery_broker_pool_active = Gauge(
-    "celery_broker_pool_active", "Currently active broker pool connections", ["worker"]
+    "celery_broker_pool_active",
+    "Currently active broker pool connections",
+    ["worker"],
+    multiprocess_mode="livesum",
 )
 
 celery_broker_pool_saturation = Gauge(
     "celery_broker_pool_saturation_percent",
     "Broker pool saturation percentage",
     ["worker"],
+    multiprocess_mode="livesum",
 )
 
 # Track concurrent publishes (proxy for pool usage)
@@ -116,12 +163,17 @@ concurrent_publishes = Gauge(
     "celery_concurrent_publishes",
     "Number of publishes happening concurrently",
     ["worker"],
+    multiprocess_mode="livesum",
 )
 
 # Track publish queue (tasks waiting for pool connection)
 publish_queue_depth = Gauge(
-    "celery_publish_queue_depth", "Tasks waiting for broker pool connection", ["worker"]
+    "celery_publish_queue_depth",
+    "Tasks waiting for broker pool connection",
+    ["worker"],
+    multiprocess_mode="livesum",
 )
+
 # Track publish timing
 publish_times = {}
 publish_lock = Lock()
@@ -441,9 +493,7 @@ def task_with_extra_connections(self, task_id, operations=10):
 
 @app.task(bind=True, base=InstrumentedTask)
 def task_with_broker_pool_contention(self, task_id, subtasks=50):
-    """
-    This task spawns subtasks, stressing Celery's broker pool.
-    """
+    """Task that spawns subtasks, stressing Celery's broker pool"""
     print(f"📤 Task {task_id} spawning {subtasks} subtasks - will exhaust broker pool")
 
     task_name = "task_with_broker_pool_contention"
@@ -451,7 +501,6 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
     start_time = time.time()
 
     try:
-        # Spawn many subtasks
         jobs = []
         publish_start = time.time()
 
@@ -460,7 +509,6 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
             result = worker_task.apply_async(args=[task_id, i], countdown=0)
             job_duration = time.time() - job_start
 
-            # Log slow publishes
             if job_duration > 0.5:
                 print(
                     f"⚠️  Slow subtask publish #{i}: {job_duration:.2f}s (pool contention!)"
@@ -469,50 +517,42 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
             jobs.append(result)
 
         publish_duration = time.time() - publish_start
-        print(
-            f"✅ Published {subtasks} subtasks in {publish_duration:.2f}s (avg {publish_duration / subtasks:.3f}s each)"
-        )
+        print(f"✅ Published {subtasks} subtasks in {publish_duration:.2f}s")
 
-        # CRITICAL: Wait for results
-        print(f"⏳ Waiting for {len(jobs)} subtask results (timeout=60s each)...")
+        # Wait for results
+        print(f"⏳ Waiting for {len(jobs)} subtask results...")
         results = []
         get_start = time.time()
 
         for i, job in enumerate(jobs):
             try:
                 result_start = time.time()
-                result = job.get(timeout=60)  # Increased timeout
+                result = job.get(timeout=60)
                 result_duration = time.time() - result_start
 
                 celery_result_get_duration.labels(
                     worker=WORKER_NAME, status="success"
                 ).observe(result_duration)
+
                 if result_duration > 5.0:
-                    print(
-                        f"🐌 Subtask #{i} took {result_duration:.1f}s to return (slow!)"
-                    )
+                    print(f"🐌 Subtask #{i} took {result_duration:.1f}s to return")
 
                 results.append(result)
 
-                # Show progress every 10 subtasks
                 if (i + 1) % 10 == 0:
                     print(f"   Progress: {i + 1}/{len(jobs)} subtasks completed")
 
             except Exception as e:
                 get_duration = time.time() - result_start
-                print(
-                    f"❌ Subtask #{i} FAILED after {get_duration:.1f}s: {type(e).__name__}: {e}"
-                )
+                print(f"❌ Subtask #{i} FAILED after {get_duration:.1f}s: {e}")
                 celery_result_get_duration.labels(
                     worker=WORKER_NAME, status="timeout"
-                ).observe(result_duration)
+                ).observe(get_duration)
                 raise
-                # Continue trying other subtasks instead of failing immediately
 
         get_duration = time.time() - get_start
         print(f"✅ Collected {len(results)}/{len(jobs)} results in {get_duration:.2f}s")
 
-        # Record success
         duration = time.time() - start_time
         task_counter.labels(
             task_name=task_name, status="success", worker=WORKER_NAME
@@ -521,7 +561,7 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
 
         success_rate = len(results) / len(jobs) * 100
         print(
-            f"🎯 Task {task_id} completed: {len(results)}/{len(jobs)} subtasks ({success_rate:.0f}%) in {duration:.1f}s total"
+            f"🎯 Task {task_id} completed: {len(results)}/{len(jobs)} subtasks ({success_rate:.0f}%)"
         )
 
         return {
@@ -531,8 +571,6 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
             "success_rate": success_rate,
             "worker": WORKER_NAME,
             "duration": duration,
-            "publish_duration": publish_duration,
-            "get_duration": get_duration,
         }
 
     except Exception as e:
