@@ -131,19 +131,19 @@ def create_connection_exhaustion_dashboard():
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(rate(celery_task_total{status='success'}[30s]))",
+                        "expr": "rate(celery_task_total{status='success'}[30s])",
                         "legendFormat": "Successful Tasks/sec",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(rate(celery_task_total{status='failure'}[30s]))",
+                        "expr": "rate(celery_task_total{status='failure'}[30s])",
                         "legendFormat": "Failed Tasks/sec",
                         "refId": "B",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(rate(celery_task_total[30s]))",
+                        "expr": "rate(celery_task_total[30s])",
                         "legendFormat": "Total Tasks/sec",
                         "refId": "C",
                     },

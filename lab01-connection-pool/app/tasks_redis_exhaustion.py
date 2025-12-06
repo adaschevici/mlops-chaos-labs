@@ -148,8 +148,6 @@ class InstrumentedTask(Task):
         duration = None
 
         try:
-            # Try to publish
-            result = super().apply_async(args=args, kwargs=kwargs, **options)
             # This is where it blocks waiting for a pool connection!
             result = super().apply_async(args=args, kwargs=kwargs, **options)
 

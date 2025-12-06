@@ -16,7 +16,7 @@ services:
     image: prom/prometheus:latest
     container_name: lab01-prometheus
     depends_on:
-      docker-proxy:
+      prometheus-exporter:
         condition: service_healthy
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -33,13 +33,27 @@ services:
   
   # The service that scrapes/collects the metrics (optional, but a common pattern)
   prometheus-exporter:
-    build: .
+    build: 
+      context: ./app
+      dockerfile: Dockerfile 
+
     command: python /app/metrics_server.py # A simple server that calls prometheus_client.start_http_server
     ports:
       - "8000:8000"
     environment:
       # Must point to the SAME directory to read all the files
       - PROMETHEUS_MULTIPROC_DIR=/var/prom/metrics
+    healthcheck:
+      # Use curl to check the /healthz path on the exposed port
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      # Run the check every 5 seconds
+      interval: 5s
+      # Wait up to 3 seconds for the check to pass
+      timeout: 3s
+      # Consider the container healthy after 3 consecutive successful checks
+      retries: 3
+      # Start checking 30 seconds after the container starts
+      start_period: 30s
     volumes:
       # Must mount the SAME volume to aggregate all files
       - prom_data:/var/prom/metrics
