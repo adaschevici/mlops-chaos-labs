@@ -562,7 +562,7 @@ def create_connection_exhaustion_dashboard():
             # ============================================================
             {
                 "type": "row",
-                "id": 101,
+                "id": 17,
                 "title": "🔶 SCENARIO 2: Celery Broker Pool Contention (Application-Level)",
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 41},
                 "collapsed": False,
@@ -570,26 +570,26 @@ def create_connection_exhaustion_dashboard():
             # Panel 11: Redis Broker Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 11,
+                "id": 18,
                 "title": "🔌 Redis Broker Pool (Celery-Managed)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 42},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_size{pool_type='broker'}",
+                        "expr": "sum(redis_pool_size{pool_type='broker'})",
                         "legendFormat": "Pool Max Size",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_in_use{pool_type='broker'}",
+                        "expr": "sum(redis_pool_in_use{pool_type='broker'})",
                         "legendFormat": "Connections In Use",
                         "refId": "B",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_pool_available{pool_type='broker'}",
+                        "expr": "sum(redis_pool_available{pool_type='broker'})",
                         "legendFormat": "Connections Available",
                         "refId": "C",
                     },
@@ -634,7 +634,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 12: Broker Pool Saturation (FIXED QUERY)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 12,
+                "id": 19,
                 "title": "Broker Pool Saturation",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 42},
@@ -642,7 +642,8 @@ def create_connection_exhaustion_dashboard():
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         # FIX: Use sum() to aggregate across workers
-                        "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
+                        # "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
+                        "expr": "avg(celery_broker_pool_saturation_percent)",
                         "refId": "A",
                     }
                 ],
@@ -667,14 +668,14 @@ def create_connection_exhaustion_dashboard():
             # Panel 13: Queue Depth
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 13,
+                "id": 20,
                 "title": "Task Queue Depth",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 42},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_task_queue_depth{queue_name='celery'}",
+                        "expr": "max(celery_task_queue_depth{queue_name='celery'})",
                         "refId": "A",
                     }
                 ],
@@ -695,7 +696,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 14: Task Publish Duration (Shows Broker Pool Contention)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 14,
+                "id": 21,
                 "title": "⏱️ Task Publish Duration (Broker Pool Contention Indicator)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 50},
@@ -753,14 +754,14 @@ def create_connection_exhaustion_dashboard():
             # Panel 15: Publish Rate
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 15,
+                "id": 22,
                 "title": "Task Publish Rate",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 50},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_publish_total[30s])",
+                        "expr": "sum(rate(celery_publish_total[30s]))",
                         "legendFormat": "Publishes/sec",
                         "refId": "A",
                     },
@@ -779,7 +780,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 16: Current Publish Duration Gauge
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 16,
+                "id": 23,
                 "title": "Current P95 Publish Time",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 50},
@@ -811,14 +812,14 @@ def create_connection_exhaustion_dashboard():
             # Panel 17: Queue Depth vs Publish Duration (THE KEY CORRELATION)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 17,
+                "id": 24,
                 "title": "🔍 SMOKING GUN: Queue Backup vs Publish Slowdown",
                 "type": "timeseries",
                 "gridPos": {"h": 10, "w": 24, "x": 0, "y": 58},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "celery_task_queue_depth{queue_name='celery'}",
+                        "expr": "max(celery_task_queue_depth{queue_name='celery'})",
                         "legendFormat": "Queue Depth (tasks)",
                         "refId": "A",
                     },
@@ -827,6 +828,11 @@ def create_connection_exhaustion_dashboard():
                         "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
                         "legendFormat": "Publish P95 Duration (ms)",
                         "refId": "B",
+                    },
+                    {
+                        "expr": "sum(celery_concurrent_publishes)",
+                        "legendFormat": "Concurrent Publishes",
+                        "refId": "C",
                     },
                 ],
                 "fieldConfig": {
@@ -879,29 +885,93 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
             },
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 25,
+                "title": "🔥 Concurrent Publishes & Publish Queue",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 57},
+                "targets": [
+                    {
+                        "expr": "sum(celery_concurrent_publishes)",
+                        "legendFormat": "Concurrent Publishes",
+                        "refId": "A",
+                    },
+                    {
+                        "expr": "sum(celery_publish_queue_depth)",
+                        "legendFormat": "Waiting for Pool",
+                        "refId": "B",
+                    },
+                    {
+                        "expr": "sum(celery_broker_pool_max)",
+                        "legendFormat": "Broker Pool Limit",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2}},
+                    "overrides": [
+                        {
+                            "matcher": {"id": "byName", "options": "Broker Pool Limit"},
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "red", "mode": "fixed"},
+                                },
+                                {
+                                    "id": "custom.lineStyle",
+                                    "value": {"dash": [10, 10], "fill": "dash"},
+                                },
+                                {"id": "custom.fillOpacity", "value": 0},
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Concurrent Publishes",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                }
+                            ],
+                        },
+                        {
+                            "matcher": {"id": "byName", "options": "Waiting for Pool"},
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "purple", "mode": "fixed"},
+                                }
+                            ],
+                        },
+                    ],
+                },
+            },
             # Panel 18: Publish Success vs Failures
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 18,
+                "id": 26,
                 "title": "📤 Publish Success vs Failures",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 66},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_publish_total[30s])",
+                        "expr": "sum(rate(celery_publish_total[30s]))",
                         "legendFormat": "Successful Publishes/sec",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_publish_failed_total[30s])",
+                        "expr": "sum(rate(celery_publish_failed_total[30s]))",
                         "legendFormat": "Failed Publishes/sec",
                         "refId": "B",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_publish_connection_errors_total[30s])",
+                        "expr": "sum(rate(celery_publish_connection_errors_total[30s]))",
                         "legendFormat": "Connection Errors/sec",
                         "refId": "C",
                     },
@@ -948,7 +1018,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 19: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 19,
+                "id": 27,
                 "title": "Task Duration Percentiles",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 66},
@@ -986,7 +1056,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 20: Broker Pool Pressure Indicator (MOST USEFUL)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 20,
+                "id": 28,
                 "title": "🔥 Broker Pool Pressure",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 66},
@@ -1030,7 +1100,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 21: Result Get Duration (Shows Blocking)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 21,
+                "id": 29,
                 "title": "⏱️ Result Get Duration (Pool Blocking Indicator)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 74},
@@ -1090,7 +1160,7 @@ def create_connection_exhaustion_dashboard():
             # ============================================================
             {
                 "type": "row",
-                "id": 110,
+                "id": 30,
                 "title": "📊 Scenario 2 Summary - Broker Pool Contention Impact",
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 74},
                 "collapsed": False,
@@ -1098,7 +1168,7 @@ def create_connection_exhaustion_dashboard():
             # Updated Panel for Broker Pool Saturation in Scenario 2 Summary
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 21,
+                "id": 31,
                 "title": "Broker Pool Saturation",
                 "type": "stat",
                 "gridPos": {"h": 5, "w": 4, "x": 0, "y": 75},
@@ -1138,7 +1208,7 @@ def create_connection_exhaustion_dashboard():
             # Also add a detailed broker pool panel in the main scenario section
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 27,
+                "id": 32,
                 "title": "🔌 Celery Broker Pool Utilization",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 50},
@@ -1207,7 +1277,7 @@ def create_connection_exhaustion_dashboard():
             # Broker Pool Saturation Gauge (for main section)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 28,
+                "id": 33,
                 "title": "Broker Pool Saturation %",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 50},
@@ -1239,7 +1309,7 @@ def create_connection_exhaustion_dashboard():
             # Publish Queue Depth (tasks waiting for broker connection)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 29,
+                "id": 34,
                 "title": "Publish Queue (Waiting for Pool)",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 50},

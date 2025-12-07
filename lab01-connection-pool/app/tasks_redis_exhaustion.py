@@ -3,12 +3,10 @@ from gevent import monkey
 
 monkey.patch_all()
 
-from celery import Celery, Task
+from celery import Celery, Task, bootsteps
 from celery.signals import (
     before_task_publish,
     after_task_publish,
-    worker_process_init,
-    worker_process_shutdown,
 )
 import time
 import random
@@ -19,6 +17,7 @@ import os
 import socket
 import gevent
 from threading import Lock
+from pathlib import Path
 
 
 PROMETHEUS_MULTIPROC_DIR = os.environ.get(
@@ -28,59 +27,53 @@ PROMETHEUS_MULTIPROC_DIR = os.environ.get(
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
 
 
-class MonitoringManager:
-    def __init__(self):
+app = Celery("chaos_lab")
+app.config_from_object("celeryconfig_redis")
+
+
+class MonitoringBootstep(bootsteps.StartStopStep):
+    """Start monitoring greenlets for gevent pool workers."""
+
+    requires = {"celery.worker.components:Pool"}
+
+    def __init__(self, worker, **kwargs):
         self.greenlets: list[gevent.Greenlet] = []
 
-    def start(self):
+    def start(self, worker):
+        multiproc_dir = Path(PROMETHEUS_MULTIPROC_DIR)
+
+        # Clean stale metric files for this PID
+        if multiproc_dir.exists():
+            for f in multiproc_dir.glob(f"*_{os.getpid()}.db"):
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+        else:
+            multiproc_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize metrics with zero values
+        task_counter.labels(task_name="init", status="success", worker=WORKER_NAME)
+        tasks_in_progress.labels(task_name="init", worker=WORKER_NAME).set(0)
+        celery_task_queue_depth.labels(queue_name="celery", worker=WORKER_NAME).set(0)
+
+        # Spawn monitoring greenlets
         self.greenlets = [
             gevent.spawn(monitor_redis_pools),
             gevent.spawn(monitor_broker_pool_saturation),
         ]
 
-    def stop(self):
-        gevent.killall(self.greenlets, timeout=5)
-        self.greenlets = []
+        print(f"✅ Worker {os.getpid()} monitoring started via bootstep")
+
+    def stop(self, worker):
+        if self.greenlets:
+            gevent.killall(self.greenlets, timeout=5)
+            self.greenlets = []
+        print(f"🧹 Worker {os.getpid()} monitoring stopped")
 
 
-_monitoring = MonitoringManager()
-
-
-@worker_process_init.connect
-def setup_metrics(**kwargs):
-    """Clean metrics dir on worker start"""
-    # Clean up old metric files for this process
-    if os.path.exists(PROMETHEUS_MULTIPROC_DIR):
-        for f in os.listdir(PROMETHEUS_MULTIPROC_DIR):
-            if str(os.getpid()) in f:
-                try:
-                    os.remove(os.path.join(PROMETHEUS_MULTIPROC_DIR, f))
-                except Exception:
-                    pass
-    else:
-        os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
-
-    # Initialize metrics with zero values so files exist immediately
-    task_counter.labels(task_name="init", status="success", worker=WORKER_NAME)
-    tasks_in_progress.labels(task_name="init", worker=WORKER_NAME).set(0)
-    celery_task_queue_depth.labels(queue_name="celery", worker=WORKER_NAME).set(0)
-    # Start background monitoring greenlets
-    _monitoring.start()
-
-    print(f"✅ Worker {os.getpid()} initialized metrics in {PROMETHEUS_MULTIPROC_DIR}")
-
-
-@worker_process_shutdown.connect
-def cleanup_metrics(**kwargs):
-    """Clean up metrics on worker shutdown"""
-    # Optionally clean up this process's metrics
-    _monitoring.stop()
-    print(f"🧹 Worker {os.getpid()} shutting down")
-
-
-app = Celery("chaos_lab")
-app.config_from_object("celeryconfig_redis")
-
+# Register AFTER app is created
+app.steps["worker"].add(MonitoringBootstep)
 # Prometheus metrics
 task_counter = Counter(
     "celery_task", "Total number of tasks", ["task_name", "status", "worker"]
@@ -203,8 +196,8 @@ publish_times = {}
 publish_lock = Lock()
 
 # FIXED: Manual counter for tracking concurrent publishes
-_concurrent_publishes_count = 0
-_concurrent_publishes_lock = Lock()
+concurrent_publishes_count = 0
+concurrent_publishes_lock = Lock()
 
 
 class InstrumentedTask(Task):
@@ -215,8 +208,9 @@ class InstrumentedTask(Task):
         global _concurrent_publishes_count
 
         # Track that we're TRYING to publish
-        with _concurrent_publishes_lock:
-            _concurrent_publishes_count += 1
+        with concurrent_publishes_lock:
+            global concurrent_publishes_count
+            concurrent_publishes_count += 1
             publish_queue_depth.labels(worker=WORKER_NAME).inc()
             concurrent_publishes.labels(worker=WORKER_NAME).inc()
         start_time = time.time()
@@ -279,6 +273,9 @@ def track_publish_start(sender=None, headers=None, body=None, **kwargs):
     """Track when task publishing starts"""
     task_id = headers.get("id") if headers else None
     if task_id:
+        with concurrent_publishes_lock:
+            global concurrent_publishes_count
+            concurrent_publishes_count += 1
         with publish_lock:
             publish_times[task_id] = time.time()
 
@@ -289,6 +286,10 @@ def track_publish_end(sender=None, headers=None, body=None, **kwargs):
     task_id = headers.get("id") if headers else None
     if task_id:
         end_time = time.time()
+        with concurrent_publishes_lock:
+            global concurrent_publishes_count
+            # Ensure the count doesn't go below zero due to potential edge cases
+            concurrent_publishes_count = max(0, concurrent_publishes_count - 1)
         with publish_lock:
             start_time = publish_times.pop(task_id, None)
 
@@ -327,11 +328,8 @@ def monitor_broker_pool_saturation():
             # Set the max gauge
             celery_broker_pool_max.labels(worker=WORKER_NAME).set(broker_pool_limit)
 
-            # Get current concurrent publishes as proxy for active connections
-            # This is a proxy because Celery doesn't expose pool._in_use directly
-            current_concurrent = concurrent_publishes._metrics.get(
-                (WORKER_NAME,), concurrent_publishes._metric_init()
-            )._value._value
+            with concurrent_publishes_lock:
+                current_concurrent = concurrent_publishes_count
 
             celery_broker_pool_active.labels(worker=WORKER_NAME).set(current_concurrent)
 
@@ -341,6 +339,8 @@ def monitor_broker_pool_saturation():
                 if broker_pool_limit > 0
                 else 0
             )
+            celery_broker_pool_saturation.labels(worker=WORKER_NAME).set(saturation)
+            concurrent_publishes.labels(worker=WORKER_NAME).set(current_concurrent)
             celery_broker_pool_saturation.labels(worker=WORKER_NAME).set(saturation)
 
             # Log when saturated

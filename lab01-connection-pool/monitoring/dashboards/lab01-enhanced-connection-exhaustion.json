@@ -4,11 +4,12 @@
   "tags": [
     "chaos-lab",
     "redis",
+    "celery",
     "connections"
   ],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 0,
+  "version": 1,
   "refresh": "5s",
   "time": {
     "from": "now-15m",
@@ -19,7 +20,7 @@
   "panels": [
     {
       "type": "row",
-      "id": 100,
+      "id": 1,
       "title": "\ud83d\udd34 SCENARIO 1: Redis Connection Pool Exhaustion (Application-Level)",
       "gridPos": {
         "h": 1,
@@ -34,8 +35,8 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 1,
-      "title": "Connection Pool Usage",
+      "id": 2,
+      "title": "Redis Connection Pool Usage",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -76,14 +77,41 @@
             "lineInterpolation": "linear"
           }
         }
-      }
+      },
+      "overrides": [
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "Max Clients Limit"
+          },
+          "properties": [
+            {
+              "id": "custom.lineStyle",
+              "value": {
+                "dash": [
+                  10,
+                  10
+                ],
+                "fill": "dash"
+              }
+            },
+            {
+              "id": "color",
+              "value": {
+                "fixedColor": "red",
+                "mode": "fixed"
+              }
+            }
+          ]
+        }
+      ]
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 2,
+      "id": 3,
       "title": "Connection Pool Usage %",
       "type": "gauge",
       "gridPos": {
@@ -140,7 +168,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 3,
+      "id": 4,
       "title": "Rejected Connections",
       "type": "stat",
       "gridPos": {
@@ -185,7 +213,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 4,
+      "id": 5,
       "title": "\u26a1 Task Throughput (Tasks/sec)",
       "type": "timeseries",
       "gridPos": {
@@ -274,7 +302,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 5,
+      "id": 6,
       "title": "Current Task Rate",
       "type": "gauge",
       "gridPos": {
@@ -297,7 +325,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "max": 150,
+          "max": 650,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -338,7 +366,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 6,
+      "id": 7,
       "title": "Tasks In Progress",
       "type": "stat",
       "gridPos": {
@@ -390,7 +418,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 7,
+      "id": 8,
       "title": "Task Duration Percentiles",
       "type": "timeseries",
       "gridPos": {
@@ -444,7 +472,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 8,
+      "id": 9,
       "title": "Task Success Rate",
       "type": "timeseries",
       "gridPos": {
@@ -499,7 +527,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 9,
+      "id": 10,
       "title": "\ud83d\udd0d CRITICAL: Connection Usage vs Task Throughput",
       "type": "timeseries",
       "gridPos": {
@@ -579,11 +607,12 @@
       },
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
           "calcs": [
             "mean",
+            "max",
             "lastNotNull"
           ]
         }
@@ -591,7 +620,7 @@
     },
     {
       "type": "row",
-      "id": 102,
+      "id": 11,
       "title": "\ud83d\udcca Summary Statistics",
       "gridPos": {
         "h": 1,
@@ -606,7 +635,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 10,
+      "id": 12,
       "title": "Total Tasks",
       "type": "stat",
       "gridPos": {
@@ -652,7 +681,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 11,
+      "id": 13,
       "title": "Successful Tasks",
       "type": "stat",
       "gridPos": {
@@ -698,7 +727,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 12,
+      "id": 14,
       "title": "Failed Tasks",
       "type": "stat",
       "gridPos": {
@@ -744,7 +773,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 13,
+      "id": 15,
       "title": "Avg Rate (tasks/min)",
       "type": "stat",
       "gridPos": {
@@ -791,7 +820,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 14,
+      "id": 16,
       "title": "Redis Connections",
       "type": "stat",
       "gridPos": {
@@ -842,7 +871,7 @@
     },
     {
       "type": "row",
-      "id": 101,
+      "id": 17,
       "title": "\ud83d\udd36 SCENARIO 2: Celery Broker Pool Contention (Application-Level)",
       "gridPos": {
         "h": 1,
@@ -857,7 +886,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 11,
+      "id": 18,
       "title": "\ud83d\udd0c Redis Broker Pool (Celery-Managed)",
       "type": "timeseries",
       "gridPos": {
@@ -872,7 +901,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "redis_pool_size{pool_type='broker'}",
+          "expr": "sum(redis_pool_size{pool_type='broker'})",
           "legendFormat": "Pool Max Size",
           "refId": "A"
         },
@@ -881,7 +910,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "redis_pool_in_use{pool_type='broker'}",
+          "expr": "sum(redis_pool_in_use{pool_type='broker'})",
           "legendFormat": "Connections In Use",
           "refId": "B"
         },
@@ -890,7 +919,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "redis_pool_available{pool_type='broker'}",
+          "expr": "sum(redis_pool_available{pool_type='broker'})",
           "legendFormat": "Connections Available",
           "refId": "C"
         }
@@ -945,7 +974,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 12,
+      "id": 19,
       "title": "Broker Pool Saturation",
       "type": "gauge",
       "gridPos": {
@@ -960,7 +989,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(redis_pool_in_use{pool_type='broker'}) / sum(redis_pool_size{pool_type='broker'}) * 100",
+          "expr": "avg(celery_broker_pool_saturation_percent)",
           "refId": "A"
         }
       ],
@@ -1002,7 +1031,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 13,
+      "id": 20,
       "title": "Task Queue Depth",
       "type": "stat",
       "gridPos": {
@@ -1017,7 +1046,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_task_queue_depth{queue_name='celery'}",
+          "expr": "max(celery_task_queue_depth{queue_name='celery'})",
           "refId": "A"
         }
       ],
@@ -1054,7 +1083,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 14,
+      "id": 21,
       "title": "\u23f1\ufe0f Task Publish Duration (Broker Pool Contention Indicator)",
       "type": "timeseries",
       "gridPos": {
@@ -1146,7 +1175,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 15,
+      "id": 22,
       "title": "Task Publish Rate",
       "type": "timeseries",
       "gridPos": {
@@ -1161,7 +1190,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_publish_total[30s])",
+          "expr": "sum(rate(celery_publish_total[30s]))",
           "legendFormat": "Publishes/sec",
           "refId": "A"
         }
@@ -1182,7 +1211,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 16,
+      "id": 23,
       "title": "Current P95 Publish Time",
       "type": "gauge",
       "gridPos": {
@@ -1239,7 +1268,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 17,
+      "id": 24,
       "title": "\ud83d\udd0d SMOKING GUN: Queue Backup vs Publish Slowdown",
       "type": "timeseries",
       "gridPos": {
@@ -1254,7 +1283,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_task_queue_depth{queue_name='celery'}",
+          "expr": "max(celery_task_queue_depth{queue_name='celery'})",
           "legendFormat": "Queue Depth (tasks)",
           "refId": "A"
         },
@@ -1266,6 +1295,11 @@
           "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
           "legendFormat": "Publish P95 Duration (ms)",
           "refId": "B"
+        },
+        {
+          "expr": "sum(celery_concurrent_publishes)",
+          "legendFormat": "Concurrent Publishes",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
@@ -1347,7 +1381,108 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 18,
+      "id": 25,
+      "title": "\ud83d\udd25 Concurrent Publishes & Publish Queue",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 57
+      },
+      "targets": [
+        {
+          "expr": "sum(celery_concurrent_publishes)",
+          "legendFormat": "Concurrent Publishes",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(celery_publish_queue_depth)",
+          "legendFormat": "Waiting for Pool",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(celery_broker_pool_max)",
+          "legendFormat": "Broker Pool Limit",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Broker Pool Limit"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Concurrent Publishes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Waiting for Pool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 26,
       "title": "\ud83d\udce4 Publish Success vs Failures",
       "type": "timeseries",
       "gridPos": {
@@ -1362,7 +1497,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_publish_total[30s])",
+          "expr": "sum(rate(celery_publish_total[30s]))",
           "legendFormat": "Successful Publishes/sec",
           "refId": "A"
         },
@@ -1371,7 +1506,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_publish_failed_total[30s])",
+          "expr": "sum(rate(celery_publish_failed_total[30s]))",
           "legendFormat": "Failed Publishes/sec",
           "refId": "B"
         },
@@ -1380,7 +1515,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_publish_connection_errors_total[30s])",
+          "expr": "sum(rate(celery_publish_connection_errors_total[30s]))",
           "legendFormat": "Connection Errors/sec",
           "refId": "C"
         }
@@ -1434,7 +1569,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 19,
+      "id": 27,
       "title": "Task Duration Percentiles",
       "type": "timeseries",
       "gridPos": {
@@ -1488,7 +1623,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 20,
+      "id": 28,
       "title": "\ud83d\udd25 Broker Pool Pressure",
       "type": "gauge",
       "gridPos": {
@@ -1550,7 +1685,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 21,
+      "id": 29,
       "title": "\u23f1\ufe0f Result Get Duration (Pool Blocking Indicator)",
       "type": "timeseries",
       "gridPos": {
@@ -1639,7 +1774,7 @@
     },
     {
       "type": "row",
-      "id": 110,
+      "id": 30,
       "title": "\ud83d\udcca Scenario 2 Summary - Broker Pool Contention Impact",
       "gridPos": {
         "h": 1,
@@ -1654,7 +1789,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 21,
+      "id": 31,
       "title": "Broker Pool Saturation",
       "type": "stat",
       "gridPos": {
@@ -1719,7 +1854,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 27,
+      "id": 32,
       "title": "\ud83d\udd0c Celery Broker Pool Utilization",
       "type": "timeseries",
       "gridPos": {
@@ -1821,7 +1956,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 28,
+      "id": 33,
       "title": "Broker Pool Saturation %",
       "type": "gauge",
       "gridPos": {
@@ -1878,7 +2013,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "id": 29,
+      "id": 34,
       "title": "Publish Queue (Waiting for Pool)",
       "type": "stat",
       "gridPos": {
