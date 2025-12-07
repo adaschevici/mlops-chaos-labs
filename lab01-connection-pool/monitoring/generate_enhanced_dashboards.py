@@ -10,10 +10,10 @@ def create_connection_exhaustion_dashboard():
     dashboard = {
         "title": "Lab 01 - Connection Pool Exhaustion Enhanced",
         "uid": "lab01-connection-exhaustion-enhanced",
-        "tags": ["chaos-lab", "redis", "connections"],
+        "tags": ["chaos-lab", "redis", "celery", "connections"],
         "timezone": "browser",
         "schemaVersion": 38,
-        "version": 0,
+        "version": 1,
         "refresh": "5s",
         "time": {"from": "now-15m", "to": "now"},
         "timepicker": {},
@@ -24,7 +24,7 @@ def create_connection_exhaustion_dashboard():
             # ============================================================
             {
                 "type": "row",
-                "id": 100,
+                "id": 1,
                 "title": "🔴 SCENARIO 1: Redis Connection Pool Exhaustion (Application-Level)",
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
                 "collapsed": False,
@@ -32,8 +32,8 @@ def create_connection_exhaustion_dashboard():
             # Panel 1: Connection Pool Usage
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 1,
-                "title": "Connection Pool Usage",
+                "id": 2,
+                "title": "Redis Connection Pool Usage",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
                 "targets": [
@@ -62,11 +62,26 @@ def create_connection_exhaustion_dashboard():
                         },
                     }
                 },
+                "overrides": [
+                    {
+                        "matcher": {"id": "byName", "options": "Max Clients Limit"},
+                        "properties": [
+                            {
+                                "id": "custom.lineStyle",
+                                "value": {"dash": [10, 10], "fill": "dash"},
+                            },
+                            {
+                                "id": "color",
+                                "value": {"fixedColor": "red", "mode": "fixed"},
+                            },
+                        ],
+                    }
+                ],
             },
             # Panel 2: Usage % Gauge
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 2,
+                "id": 3,
                 "title": "Connection Pool Usage %",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1},
@@ -98,7 +113,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 3: Rejected Connections
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 3,
+                "id": 4,
                 "title": "Rejected Connections",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
@@ -124,26 +139,26 @@ def create_connection_exhaustion_dashboard():
             # Panel 4: Task Throughput (Tasks/sec)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 4,
+                "id": 5,
                 "title": "⚡ Task Throughput (Tasks/sec)",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_task_total{status='success'}[30s])",
+                        "expr": "sum(rate(celery_task_total{status='success'}[30s]))",
                         "legendFormat": "Successful Tasks/sec",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_task_total{status='failure'}[30s])",
+                        "expr": "sum(rate(celery_task_total{status='failure'}[30s]))",
                         "legendFormat": "Failed Tasks/sec",
                         "refId": "B",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "rate(celery_task_total[30s])",
+                        "expr": "sum(rate(celery_task_total[30s]))",
                         "legendFormat": "Total Tasks/sec",
                         "refId": "C",
                     },
@@ -188,7 +203,7 @@ def create_connection_exhaustion_dashboard():
             # ------------------------------------------------------------------
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 5,
+                "id": 6,
                 "title": "Current Task Rate",
                 "type": "gauge",
                 "gridPos": {"h": 8, "w": 6, "x": 12, "y": 9},
@@ -203,7 +218,7 @@ def create_connection_exhaustion_dashboard():
                     "defaults": {
                         "unit": "ops",
                         "min": 0,
-                        "max": 150,  # Increased to accommodate 118+ ops/s
+                        "max": 650,  # Increased to accommodate 118+ ops/s
                         "thresholds": {
                             "mode": "absolute",
                             "steps": [
@@ -225,7 +240,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 6: Tasks In Progress
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 6,
+                "id": 7,
                 "title": "Tasks In Progress",
                 "type": "stat",
                 "gridPos": {"h": 8, "w": 6, "x": 18, "y": 9},
@@ -253,7 +268,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 7: Task Duration (P50, P95, P99)
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 7,
+                "id": 8,
                 "title": "Task Duration Percentiles",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
@@ -291,7 +306,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 8: Success Rate %
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 8,
+                "id": 9,
                 "title": "Task Success Rate",
                 "type": "timeseries",
                 "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
@@ -327,7 +342,7 @@ def create_connection_exhaustion_dashboard():
             # Panel 9: THE KEY CORRELATION - Connections vs Task Throughput
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 9,
+                "id": 10,
                 "title": "🔍 CRITICAL: Connection Usage vs Task Throughput",
                 "type": "timeseries",
                 "gridPos": {"h": 10, "w": 24, "x": 0, "y": 25},
@@ -385,17 +400,17 @@ def create_connection_exhaustion_dashboard():
                 },
                 "options": {
                     "legend": {
-                        "displayMode": "list",
+                        "displayMode": "table",
                         "placement": "bottom",
                         "showLegend": True,
-                        "calcs": ["mean", "lastNotNull"],
+                        "calcs": ["mean", "max", "lastNotNull"],
                     }
                 },
             },
             # Better approach: Summary stats as stat panels in a row
             {
                 "type": "row",
-                "id": 102,
+                "id": 11,
                 "title": "📊 Summary Statistics",
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
                 "collapsed": False,
@@ -403,7 +418,7 @@ def create_connection_exhaustion_dashboard():
             # Total Tasks
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 10,
+                "id": 12,
                 "title": "Total Tasks",
                 "type": "stat",
                 "gridPos": {"h": 4, "w": 5, "x": 0, "y": 36},
@@ -430,7 +445,7 @@ def create_connection_exhaustion_dashboard():
             # Successful Tasks
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 11,
+                "id": 13,
                 "title": "Successful Tasks",
                 "type": "stat",
                 "gridPos": {"h": 4, "w": 5, "x": 5, "y": 36},
@@ -457,7 +472,7 @@ def create_connection_exhaustion_dashboard():
             # Failed Tasks
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 12,
+                "id": 14,
                 "title": "Failed Tasks",
                 "type": "stat",
                 "gridPos": {"h": 4, "w": 5, "x": 10, "y": 36},
@@ -484,7 +499,7 @@ def create_connection_exhaustion_dashboard():
             # Average Rate
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 13,
+                "id": 15,
                 "title": "Avg Rate (tasks/min)",
                 "type": "stat",
                 "gridPos": {"h": 4, "w": 5, "x": 15, "y": 36},
@@ -512,7 +527,7 @@ def create_connection_exhaustion_dashboard():
             # Current Connections
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "id": 14,
+                "id": 16,
                 "title": "Redis Connections",
                 "type": "stat",
                 "gridPos": {"h": 4, "w": 4, "x": 20, "y": 36},

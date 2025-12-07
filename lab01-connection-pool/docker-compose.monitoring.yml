@@ -61,6 +61,8 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - lab01-network
 
   grafana:
     image: grafana/grafana:latest

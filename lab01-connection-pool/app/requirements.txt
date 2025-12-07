@@ -10,3 +10,4 @@ gevent==25.9.1
 click==8.3.1
 fastapi==0.124.0
 uvicorn==0.38.0
+structlog==25.5.0

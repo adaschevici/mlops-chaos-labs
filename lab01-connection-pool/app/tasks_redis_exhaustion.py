@@ -28,6 +28,24 @@ PROMETHEUS_MULTIPROC_DIR = os.environ.get(
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
 
 
+class MonitoringManager:
+    def __init__(self):
+        self.greenlets: list[gevent.Greenlet] = []
+
+    def start(self):
+        self.greenlets = [
+            gevent.spawn(monitor_redis_pools),
+            gevent.spawn(monitor_broker_pool_saturation),
+        ]
+
+    def stop(self):
+        gevent.killall(self.greenlets, timeout=5)
+        self.greenlets = []
+
+
+_monitoring = MonitoringManager()
+
+
 @worker_process_init.connect
 def setup_metrics(**kwargs):
     """Clean metrics dir on worker start"""
@@ -42,6 +60,13 @@ def setup_metrics(**kwargs):
     else:
         os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
 
+    # Initialize metrics with zero values so files exist immediately
+    task_counter.labels(task_name="init", status="success", worker=WORKER_NAME)
+    tasks_in_progress.labels(task_name="init", worker=WORKER_NAME).set(0)
+    celery_task_queue_depth.labels(queue_name="celery", worker=WORKER_NAME).set(0)
+    # Start background monitoring greenlets
+    _monitoring.start()
+
     print(f"✅ Worker {os.getpid()} initialized metrics in {PROMETHEUS_MULTIPROC_DIR}")
 
 
@@ -49,6 +74,7 @@ def setup_metrics(**kwargs):
 def cleanup_metrics(**kwargs):
     """Clean up metrics on worker shutdown"""
     # Optionally clean up this process's metrics
+    _monitoring.stop()
     print(f"🧹 Worker {os.getpid()} shutting down")
 
 
@@ -57,7 +83,7 @@ app.config_from_object("celeryconfig_redis")
 
 # Prometheus metrics
 task_counter = Counter(
-    "celery_task_total", "Total number of tasks", ["task_name", "status", "worker"]
+    "celery_task", "Total number of tasks", ["task_name", "status", "worker"]
 )
 
 task_duration = Histogram(
@@ -83,7 +109,7 @@ celery_task_queue_depth = Gauge(
 )
 
 celery_broker_operations = Counter(
-    "celery_broker_operations_total", "Total broker operations", ["operation", "worker"]
+    "celery_broker_operations", "Total broker operations", ["operation", "worker"]
 )
 
 # Redis connection pool metrics (from redis-py directly)
@@ -116,17 +142,15 @@ celery_publish_duration = Histogram(
     buckets=[0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0],
 )
 
-celery_publish_total = Counter(
-    "celery_publish_total", "Total tasks published", ["worker"]
-)
+celery_publish_total = Counter("celery_publish", "Total tasks published", ["worker"])
 
 # Add new metrics for publish failures
 celery_publish_failed = Counter(
-    "celery_publish_failed_total", "Failed task publishes", ["worker", "error_type"]
+    "celery_publish_failed", "Failed task publishes", ["worker", "error_type"]
 )
 
 celery_publish_connection_errors = Counter(
-    "celery_publish_connection_errors_total",
+    "celery_publish_connection_errors",
     "Connection errors during publish",
     ["worker"],
 )

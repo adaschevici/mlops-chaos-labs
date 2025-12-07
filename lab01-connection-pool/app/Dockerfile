@@ -22,9 +22,9 @@ COPY . .
 RUN useradd -m -u 1000 celeryuser && \
     chown -R celeryuser:celeryuser /app
 
-RUN mkdir -p /var/prom/metrics
+RUN mkdir -p /tmp/prometheus-multiproc
 
-RUN chown -R celeryuser:celeryuser /var/prom/metrics
+RUN chown -R celeryuser:celeryuser /tmp/prometheus-multiproc
 
 USER celeryuser
 

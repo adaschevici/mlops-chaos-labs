@@ -1,12 +1,34 @@
 import os
 import sys
-from typing import Dict, Any
+from pathlib import Path
 
 from prometheus_client import CollectorRegistry, multiprocess, generate_latest
 from prometheus_client.exposition import CONTENT_TYPE_LATEST
 from fastapi import FastAPI, Response, HTTPException
+import structlog
+import logging
 import uvicorn
 
+# Configure once at module level
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+
+# Set log level
+logging.basicConfig(level=logging.INFO)
+
+logger = structlog.get_logger()
 # ----------------------------------------------------------------------
 # Prometheus FastAPI Metrics Exporter for Multiprocess Celery Workers
 # ----------------------------------------------------------------------
@@ -14,7 +36,7 @@ import uvicorn
 # --- Configuration ---
 # Get the directory from environment variable, fall back to default
 PROMETHEUS_MULTIPROC_DIR = os.environ.get(
-    "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus_multiproc"
+    "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc"
 )
 HOST = "0.0.0.0"
 PORT = 9080
@@ -45,61 +67,59 @@ def collect_multiprocess_metrics(path: str) -> bytes:
         return b""
 
 
+PROMETHEUS_MULTIPROC_DIR = Path(
+    os.environ.get("PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc")
+)
+
+
 @app.get("/metrics")
-# This route is defined as synchronous. FastAPI automatically runs it
-# in the thread pool, ensuring the main Uvicorn event loop is non-blocking.
-def metrics() -> Response:
-    """
-    Endpoint that aggregates and exposes Prometheus metrics from all worker files.
-    """
-    output = collect_multiprocess_metrics(PROMETHEUS_MULTIPROC_DIR)
-
-    if not output:
-        # If aggregation failed (e.g., no files or permission error), return a 500 error
-        raise HTTPException(
-            status_code=500,
-            detail="Metric aggregation failed. Check PROMETHEUS_MULTIPROC_DIR permissions.",
-        )
-
-    # Use the official CONTENT_TYPE_LATEST constant from prometheus_client
-    return Response(content=output, media_type=CONTENT_TYPE_LATEST)
-
-
-@app.get("/healthz", response_model=Dict[str, Any])
-# This route is also defined as synchronous and runs in the thread pool.
-def health() -> Dict[str, Any]:
-    """
-    Lightweight health check endpoint to verify the exporter process is alive
-    and can access the metrics directory.
-    """
-    # 1. Check if metrics directory exists and is accessible
-    if not os.path.exists(PROMETHEUS_MULTIPROC_DIR):
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "error",
-                "message": f"Metrics directory not found: {PROMETHEUS_MULTIPROC_DIR}",
-            },
-        )
-
-    # 2. Check if we can list files (synchronous I/O)
+async def metrics():
     try:
-        files = os.listdir(PROMETHEUS_MULTIPROC_DIR)
-    except OSError as e:
-        # Handles permission denied errors ([Errno 13])
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        logger.error(
+            "metric_aggregation_failed", error=str(e), error_type=type(e).__name__
+        )
+
+        for f in PROMETHEUS_MULTIPROC_DIR.glob("*.db"):
+            try:
+                f.unlink()
+            except Exception as _e:
+                pass
+
+        logger.info("metrics_reset", reason="corruption")
+        return Response(
+            "# Metrics reset due to corruption\n", media_type=CONTENT_TYPE_LATEST
+        )
+
+
+@app.get("/healthz")
+def health() -> dict:
+    """Health check endpoint."""
+    if not PROMETHEUS_MULTIPROC_DIR.exists():
         raise HTTPException(
             status_code=500,
             detail={
                 "status": "error",
-                "message": f"Permission denied to list files in metrics directory: {e}",
+                "message": f"Directory not found: {PROMETHEUS_MULTIPROC_DIR}",
             },
+        )
+
+    try:
+        files = list(PROMETHEUS_MULTIPROC_DIR.iterdir())
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "message": f"Permission denied: {e}"},
         )
 
     return {
         "status": "healthy",
-        "metrics_dir": PROMETHEUS_MULTIPROC_DIR,
+        "metrics_dir": str(PROMETHEUS_MULTIPROC_DIR),
         "metric_files": len(files),
-        "files": files[:10],  # Show first 10 files
+        "files": [f.name for f in files[:10]],
     }
 
 

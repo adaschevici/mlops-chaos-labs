@@ -10,7 +10,7 @@ services:
     labels:
       - __meta_docker_container_label_com_docker_compose_service
     environment:
-      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-multiproc
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
