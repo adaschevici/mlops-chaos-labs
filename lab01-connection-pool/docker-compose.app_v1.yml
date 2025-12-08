@@ -16,7 +16,7 @@ services:
     volumes:
       - ./app:/app
       - prometheus-multiproc:/tmp/prometheus-multiproc:rw
-    command: celery -A tasks_redis_exhaustion worker --loglevel=info --pool=gevent --concurrency=400
+    command: celery -A celery worker --loglevel=info --pool=gevent --concurrency=400
     networks:
       - lab01-network
 

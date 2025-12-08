@@ -16,3 +16,8 @@ worker_max_tasks_per_child = None  # Never restart
 # This will cause the breakdown
 result_expires = None  # Results never expire (memory pressure)
 task_track_started = True  # Extra Redis writes
+
+# imports = (
+#     "tasks.redis_exhaustion",
+#     "tasks.broker_pool_contention",  # if you have this
+# )
