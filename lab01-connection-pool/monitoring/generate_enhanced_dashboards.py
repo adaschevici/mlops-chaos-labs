@@ -237,72 +237,72 @@ def create_connection_exhaustion_dashboard():
                     "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
                 },
             },
-            # # Panel 6: Tasks In Progress
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 7,
-            #     "title": "Tasks In Progress",
-            #     "type": "stat",
-            #     "gridPos": {"h": 8, "w": 6, "x": 18, "y": 9},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(celery_tasks_in_progress)",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {
-            #                 "steps": [
-            #                     {"color": "green", "value": None},
-            #                     {"color": "yellow", "value": 100},
-            #                     {"color": "red", "value": 200},
-            #                 ]
-            #             },
-            #         }
-            #     },
-            #     "options": {"colorMode": "background", "graphMode": "area"},
-            # },
-            # # Panel 7: Task Duration (P50, P95, P99)
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 8,
-            #     "title": "Task Duration Percentiles",
-            #     "type": "timeseries",
-            #     "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "histogram_quantile(0.50, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
-            #             "legendFormat": "P50 (median)",
-            #             "refId": "A",
-            #         },
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
-            #             "legendFormat": "P95",
-            #             "refId": "B",
-            #         },
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "histogram_quantile(0.99, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
-            #             "legendFormat": "P99",
-            #             "refId": "C",
-            #         },
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "unit": "s",
-            #             "custom": {
-            #                 "axisLabel": "Duration (seconds)",
-            #                 "fillOpacity": 10,
-            #                 "lineWidth": 2,
-            #             },
-            #         }
-            #     },
-            # },
+            # Panel 6: Tasks In Progress
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 7,
+                "title": "Tasks In Progress",
+                "type": "stat",
+                "gridPos": {"h": 8, "w": 6, "x": 18, "y": 9},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_tasks_in_progress)",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "red", "value": None},
+                                {"color": "yellow", "value": 300},
+                                {"color": "green", "value": 900},
+                            ]
+                        },
+                    }
+                },
+                "options": {"colorMode": "background", "graphMode": "area"},
+            },
+            # Panel 7: Task Duration (P50, P95, P99)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 8,
+                "title": "Task Duration Percentiles",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.50, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P50 (median)",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P95",
+                        "refId": "B",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "histogram_quantile(0.99, sum(rate(celery_task_duration_seconds_bucket[1m])) by (le))",
+                        "legendFormat": "P99",
+                        "refId": "C",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "s",
+                        "custom": {
+                            "axisLabel": "Duration (seconds)",
+                            "fillOpacity": 10,
+                            "lineWidth": 2,
+                        },
+                    }
+                },
+            },
             # # Panel 8: Success Rate %
             # {
             #     "datasource": {"type": "prometheus", "uid": "prometheus"},

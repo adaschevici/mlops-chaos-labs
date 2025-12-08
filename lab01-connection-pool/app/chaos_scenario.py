@@ -21,7 +21,7 @@ def print_header(title):
     echo("=" * 70 + "\n")
 
 
-def scenario_1_connection_explosion(num_tasks=1800):
+def scenario_1_connection_explosion(num_tasks=10000):
     """Enhanced with throughput tracking"""
     print_header("SCENARIO 1: Connection Explosion")
 
