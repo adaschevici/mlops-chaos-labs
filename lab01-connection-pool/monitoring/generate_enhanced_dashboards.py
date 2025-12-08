@@ -201,42 +201,42 @@ def create_connection_exhaustion_dashboard():
             # ------------------------------------------------------------------
             # Panel 5: Current Task Rate Gauge
             # ------------------------------------------------------------------
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 6,
-            #     "title": "Current Task Rate",
-            #     "type": "gauge",
-            #     "gridPos": {"h": 8, "w": 6, "x": 12, "y": 9},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(rate(celery_task_total[30s]))",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "unit": "ops",
-            #             "min": 0,
-            #             "max": 650,  # Increased to accommodate 118+ ops/s
-            #             "thresholds": {
-            #                 "mode": "absolute",
-            #                 "steps": [
-            #                     {"color": "red", "value": 0},  # 0-10: Critical
-            #                     {"color": "orange", "value": 10},  # 10-30: Poor
-            #                     {"color": "yellow", "value": 30},  # 30-70: Moderate
-            #                     {"color": "green", "value": 70},  # 70+: Excellent
-            #                 ],
-            #             },
-            #         }
-            #     },
-            #     "options": {
-            #         "showThresholdLabels": True,
-            #         "showThresholdMarkers": True,
-            #         "orientation": "auto",
-            #         "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
-            #     },
-            # },
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 6,
+                "title": "Current Task Rate",
+                "type": "gauge",
+                "gridPos": {"h": 8, "w": 6, "x": 12, "y": 9},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(rate(celery_task_total[30s]))",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "ops",
+                        "min": 0,
+                        "max": 400,  # Increased to accommodate 118+ ops/s
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "red", "value": 0},  # 0-30: Critical
+                                {"color": "orange", "value": 30},  # 30-70: Poor
+                                {"color": "yellow", "value": 70},  # 70-120: Moderate
+                                {"color": "green", "value": 120},  # 120+: Excellent
+                            ],
+                        },
+                    }
+                },
+                "options": {
+                    "showThresholdLabels": True,
+                    "showThresholdMarkers": True,
+                    "orientation": "auto",
+                    "reduceOptions": {"values": False, "calcs": ["lastNotNull"]},
+                },
+            },
             # # Panel 6: Tasks In Progress
             # {
             #     "datasource": {"type": "prometheus", "uid": "prometheus"},
