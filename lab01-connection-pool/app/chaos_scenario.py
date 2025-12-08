@@ -1,9 +1,9 @@
 from collections import deque
 from click import echo, command, argument, Choice
-from .tasks.redis_exhaustion import (
+from tasks.redis_exhaustion import (
     task_with_extra_connections,
 )
-from .tasks.broker_pool_contention import (
+from tasks.broker_pool_contention import (
     task_with_broker_pool_contention,
 )
 from metrics import (

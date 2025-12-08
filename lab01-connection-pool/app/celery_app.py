@@ -23,8 +23,11 @@ WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
 app.autodiscover_tasks(
-    ["tasks.broker_pool_contention.tasks", "tasks.redis_exhaustion.tasks"], force=True
+    ["tasks.redis_exhaustion", "tasks.broker_pool_contention"], force=True
 )
+# app.autodiscover_tasks(
+#     ["tasks.broker_pool_contention", "tasks.redis_exhaustion"], force=True
+# )
 
 # class MonitoringBootstep(bootsteps.StartStopStep):
 #     """Start monitoring greenlets for gevent pool workers."""
