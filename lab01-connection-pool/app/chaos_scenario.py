@@ -24,20 +24,7 @@ def scenario_1_connection_explosion(num_tasks=1800):
     print_header("SCENARIO 1: Connection Explosion")
     hostname = get_container_id_via_hostname()
 
-    echo("📊 Setup:")
-    echo(f"  Total tasks: {num_tasks}")
-    echo("  Workers: 3")
-    echo("  Concurrency per worker: 150\n")
-
     echo(f"🚀 Submitting {num_tasks} tasks...\n")
-
-    # Check initial Redis state
-    initial_stats = get_redis_stats()
-    if initial_stats:
-        echo("📊 Initial Redis State:")
-        echo(f"   maxclients: {initial_stats['maxclients']}")
-        echo(f"   connected_clients: {initial_stats['connected_clients']}")
-        echo(f"   Usage: {initial_stats['usage_percent']:.1f}%\n")
 
     job = group(
         task_with_extra_connections.s(task_id=i, operations=10)
@@ -133,33 +120,14 @@ def scenario_1_connection_explosion(num_tasks=1800):
             if rolling_avg_rate > 0 and pending > 0:
                 eta_seconds = pending / rolling_avg_rate
                 eta_minutes = eta_seconds / 60
-                eta_str = (
+                _eta_str = (
                     f"{eta_minutes:.1f}m" if eta_minutes >= 1 else f"{eta_seconds:.0f}s"
                 )
             else:
-                eta_str = "unknown"
+                _eta_str = "unknown"
 
             # Progress percentage
-            progress_pct = (ready / num_tasks * 100) if num_tasks > 0 else 0
-
-            # Print progress with throughput
-            echo(f"Container ID: {hostname}                         ")
-            echo(f"Redis Connections: {conn_str} | Rejected: {rejected}     ")
-            echo(
-                f"[{elapsed:6.1f}s] "
-                f"Progress: {ready:4d}/{num_tasks} ({progress_pct:5.1f}%) | "
-                f"Success: {successful:4d} | "
-                f"Failed: {failed:4d} | "
-                f"Pending: {pending:4d}"
-            )
-
-            echo(
-                f"           "
-                f"Rate: {instant_rate:5.1f} t/s (instant) | "
-                f"{rolling_avg_rate:5.1f} t/s (rolling) | "
-                f"{avg_rate:5.1f} t/s (avg) | "
-                f"ETA: {eta_str}"
-            )
+            _progress_pct = (ready / num_tasks * 100) if num_tasks > 0 else 0
 
             # Detect throughput degradation
             if len(throughput_window) >= 5:
@@ -213,33 +181,6 @@ def scenario_1_connection_explosion(num_tasks=1800):
             echo(f"   Average duration: {duration / ready:.2f}s per task")
         elif ready == 0:
             echo("   Average duration: Inf(s) per task")
-
-        final_redis = get_redis_stats()
-        if final_redis:
-            echo("\n🔌 Redis Connection Statistics:")
-            echo(
-                f"   Initial connections: {initial_stats['connected_clients'] if initial_stats else 'unknown'}"
-            )
-            echo(f"   Peak connections: {max_connections_seen}")
-            echo(f"   Final connections: {final_redis['connected_clients']}")
-            echo(f"   maxclients limit: {final_redis['maxclients']}")
-            echo(
-                f"   Peak usage: {max_connections_seen / final_redis['maxclients'] * 100:.1f}%"
-            )
-
-            if final_redis.get("rejected_connections", 0) > 0:
-                echo(
-                    f"   ❌ Rejected connections: {final_redis['rejected_connections']}"
-                )
-                echo("      This confirms connection pool exhaustion!")
-
-            # Connection growth rate
-            if initial_stats and duration > 0:
-                growth = max_connections_seen - initial_stats["connected_clients"]
-                growth_rate = growth / duration
-                echo(
-                    f"   Connection growth: +{growth} ({growth_rate:.1f} connections/sec)"
-                )
 
         if successful > 0:
             echo(f"   Success rate: {successful / ready * 100:.1f}% (of completed)")

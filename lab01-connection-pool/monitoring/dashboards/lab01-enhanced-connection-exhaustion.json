@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 5,
   "refresh": "5s",
   "time": {
     "from": "now-15m",
@@ -76,35 +76,36 @@
             "drawStyle": "line",
             "lineInterpolation": "linear"
           }
-        }
-      },
-      "overrides": [
-        {
-          "matcher": {
-            "id": "byName",
-            "options": "Max Clients Limit"
-          },
-          "properties": [
-            {
-              "id": "custom.lineStyle",
-              "value": {
-                "dash": [
-                  10,
-                  10
-                ],
-                "fill": "dash"
-              }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max Clients Limit"
             },
-            {
-              "id": "color",
-              "value": {
-                "fixedColor": "red",
-                "mode": "fixed"
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
               }
-            }
-          ]
-        }
-      ]
+            ]
+          }
+        ]
+      },
+      "options": {}
     },
     {
       "datasource": {
@@ -295,7 +296,8 @@
             ]
           }
         ]
-      }
+      },
+      "options": {}
     },
     {
       "datasource": {
@@ -320,46 +322,7 @@
           "expr": "sum(rate(celery_task_total[30s]))",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "min": 0,
-          "max": 650,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "yellow",
-                "value": 30
-              },
-              {
-                "color": "green",
-                "value": 70
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true,
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -384,34 +347,7 @@
           "expr": "sum(celery_tasks_in_progress)",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 200
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area"
-      }
+      ]
     },
     {
       "datasource": {
@@ -455,17 +391,7 @@
           "legendFormat": "P99",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "axisLabel": "Duration (seconds)",
-            "fillOpacity": 10,
-            "lineWidth": 2
-          }
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -491,36 +417,7 @@
           "legendFormat": "Success Rate %",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "axisLabel": "Success %",
-            "fillOpacity": 20,
-            "lineWidth": 2
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 80
-              },
-              {
-                "color": "green",
-                "value": 95
-              }
-            ]
-          }
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -555,68 +452,7 @@
           "legendFormat": "Task Throughput (scaled 5x for visibility)",
           "refId": "B"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 15,
-            "lineWidth": 3,
-            "drawStyle": "line",
-            "lineInterpolation": "smooth"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Task Throughput (scaled 5x for visibility)"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Connection Usage %"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": [
-            "mean",
-            "max",
-            "lastNotNull"
-          ]
-        }
-      }
+      ]
     },
     {
       "type": "row",
@@ -653,28 +489,7 @@
           "expr": "sum(celery_task_total)",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name"
-      }
+      ]
     },
     {
       "datasource": {
@@ -699,28 +514,7 @@
           "expr": "sum(celery_task_total{status='success'})",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name"
-      }
+      ]
     },
     {
       "datasource": {
@@ -745,28 +539,7 @@
           "expr": "sum(celery_task_total{status='failure'})",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name"
-      }
+      ]
     },
     {
       "datasource": {
@@ -791,29 +564,7 @@
           "expr": "sum(rate(celery_task_total[5m])) * 60",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "yellow",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 2,
-          "unit": "cpm"
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "textMode": "value_and_name"
-      }
+      ]
     },
     {
       "datasource": {
@@ -838,36 +589,7 @@
           "expr": "redis_connected_clients",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "textMode": "value_and_name"
-      }
+      ]
     },
     {
       "type": "row",
@@ -923,51 +645,7 @@
           "legendFormat": "Connections Available",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Connections",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Connections In Use"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Connections Available"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "datasource": {
@@ -989,42 +667,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "avg(celery_broker_pool_saturation_percent)",
+          "expr": "(sum(celery_broker_pool_active) / sum(celery_broker_pool_max) * 100) unless sum(celery_broker_pool_max) == 0",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 95
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true
-      }
+      ]
     },
     {
       "datasource": {
@@ -1049,34 +695,7 @@
           "expr": "max(celery_task_queue_depth{queue_name='celery'})",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 500
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area"
-      }
+      ]
     },
     {
       "datasource": {
@@ -1120,55 +739,7 @@
           "legendFormat": "P99",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "axisLabel": "Publish Duration (seconds)",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.1
-              },
-              {
-                "color": "orange",
-                "value": 0.5
-              },
-              {
-                "color": "red",
-                "value": 1.0
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "P99"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "datasource": {
@@ -1194,17 +765,7 @@
           "legendFormat": "Publishes/sec",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "axisLabel": "Publishes/second",
-            "fillOpacity": 20,
-            "lineWidth": 2
-          }
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -1229,39 +790,7 @@
           "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le))",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "min": 0,
-          "max": 10,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 0.1
-              },
-              {
-                "color": "orange",
-                "value": 0.5
-              },
-              {
-                "color": "red",
-                "value": 1.0
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true
-      }
+      ]
     },
     {
       "datasource": {
@@ -1297,84 +826,15 @@
           "refId": "B"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(celery_concurrent_publishes)",
           "legendFormat": "Concurrent Publishes",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 3,
-            "drawStyle": "line",
-            "lineInterpolation": "smooth"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Queue Depth (tasks)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "left"
-              },
-              {
-                "id": "unit",
-                "value": "short"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Publish P95 Duration (ms)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": [
-            "mean",
-            "max",
-            "lastNotNull"
-          ]
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -1406,76 +866,7 @@
           "legendFormat": "Broker Pool Limit",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 15,
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Broker Pool Limit"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Concurrent Publishes"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Waiting for Pool"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "datasource": {
@@ -1519,50 +910,7 @@
           "legendFormat": "Connection Errors/sec",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed Publishes/sec"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Connection Errors/sec"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "datasource": {
@@ -1606,17 +954,7 @@
           "legendFormat": "P99",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "axisLabel": "Duration (seconds)",
-            "fillOpacity": 10,
-            "lineWidth": 2
-          }
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -1641,44 +979,7 @@
           "expr": "histogram_quantile(0.95, sum(rate(celery_publish_duration_seconds_bucket[1m])) by (le)) * 1000",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "min": 0,
-          "max": 1000,
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 10
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true,
-        "text": {
-          "titleSize": 14,
-          "valueSize": 32
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -1722,55 +1023,7 @@
           "legendFormat": "P50 (timeout)",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "axisLabel": "Get Duration (seconds)",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "red",
-                "value": 45
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "P50 (timeout)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "type": "row",
@@ -1804,50 +1057,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_broker_pool_saturation_percent",
+          "expr": "(sum(celery_broker_pool_active) / sum(celery_broker_pool_max) * 100) unless sum(celery_broker_pool_max) == 0",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 95
-              }
-            ]
-          },
-          "unit": "percent",
-          "decimals": 1
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      }
+      ]
     },
     {
       "datasource": {
@@ -1869,7 +1082,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_broker_pool_max",
+          "expr": "sum(celery_broker_pool_max)",
           "legendFormat": "Pool Max Size (Config Limit)",
           "refId": "A"
         },
@@ -1878,7 +1091,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_broker_pool_active",
+          "expr": "sum(celery_broker_pool_active)",
           "legendFormat": "Active Connections (In Use)",
           "refId": "B"
         },
@@ -1887,69 +1100,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_concurrent_publishes",
+          "expr": "sum(celery_concurrent_publishes)",
           "legendFormat": "Concurrent Publishes",
           "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Connections",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Active Connections (In Use)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Pool Max Size (Config Limit)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "datasource": {
@@ -1971,42 +1126,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_broker_pool_saturation_percent",
+          "expr": "(sum(celery_broker_pool_active) / sum(celery_broker_pool_max) * 100) unless sum(celery_broker_pool_max) == 0",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 95
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true
-      }
+      ]
     },
     {
       "datasource": {
@@ -2028,43 +1151,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "celery_publish_queue_depth",
+          "expr": "sum(celery_publish_queue_depth)",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 10
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          },
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "textMode": "value_and_name"
-      }
+      ]
     }
   ]
 }
