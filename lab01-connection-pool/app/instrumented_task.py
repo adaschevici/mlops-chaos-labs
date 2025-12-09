@@ -11,6 +11,7 @@ from celery_app import WORKER_NAME
 
 
 celery_publish_total = Counter("celery_publish", "Total tasks published", ["worker"])
+
 # Publish duration metric
 celery_publish_duration = Histogram(
     "celery_publish_duration_seconds",
@@ -48,68 +49,104 @@ publish_queue_depth = Gauge(
 
 
 class InstrumentedTask(Task):
-    """Custom task class that tracks publish failures"""
+    """
+    Gevent-compatible task class that tracks publish timing.
+
+    Measures the full apply_async duration including:
+    - Connection pool acquisition wait
+    - Serialization
+    - Network I/O to broker
+    """
+
+    # Class-level thresholds (can be overridden per-task)
+    CRITICAL_THRESHOLD = 5.0
+    SEVERE_THRESHOLD = 1.0
+    WARNING_THRESHOLD = 0.5
+    SLOW_THRESHOLD = 0.1
 
     def apply_async(self, args=None, kwargs=None, **options):
-        """Override apply_async to track publishing"""
-        # global _concurrent_publishes_count
-        #
-        # # Track that we're TRYING to publish
-        # with concurrent_publishes_lock:
-        #     global concurrent_publishes_count
-        #     concurrent_publishes_count += 1
-        #     publish_queue_depth.labels(worker=WORKER_NAME).inc()
-        #     concurrent_publishes.labels(worker=WORKER_NAME).inc()
-        start_time = time.time()
+        """
+        Override apply_async to track publishing duration.
+
+        This captures the actual blocking time, which with gevent
+        means time waiting for broker connection from pool.
+        """
+        start_time = time.monotonic()
 
         duration = None
 
         try:
-            # This is where it blocks waiting for a pool connection!
+            # This is where blocking happens:
+            # 1. Get connection from pool (can block if exhausted)
+            # 2. Serialize task
+            # 3. Send to broker
             result = super().apply_async(args=args, kwargs=kwargs, **options)
 
-            # Track successful publish duration
-            duration = time.time() - start_time
-            celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
-            celery_publish_total.labels(worker=WORKER_NAME).inc()
-
-            # Log pool contention
-            if duration > 5.0:
-                print(
-                    f"🔴🔴🔴 CRITICAL POOL WAIT: {duration:.3f}s - BROKER POOL SATURATED!"
-                )
-            elif duration > 1.0:
-                print(
-                    f"🔴 Severe pool contention: {duration:.3f}s waiting for broker connection"
-                )
-            elif duration > 0.5:
-                print(f"🟡 Pool pressure: {duration:.3f}s")
+            # successful publish
+            duration = time.monotonic() - start_time
+            self._record_publish_success(duration)
 
             return result
 
-        except redis.exceptions.ConnectionError as _e:
+        except redis.exceptions.ConnectionError as e:
             # Track connection error
-            duration = time.time() - start_time
-            celery_publish_connection_errors.labels(worker=WORKER_NAME).inc()
-            celery_publish_failed.labels(
-                worker=WORKER_NAME, error_type="ConnectionError"
-            ).inc()
+            duration = time.monotonic() - start_time
+            self._record_connection_error(duration, e)
+            raise
 
-            print(f"🔴🔴🔴 PUBLISH FAILED: ConnectionError after {duration:.3f}s")
-            print("           Cannot get Redis connection to publish task!")
+        except redis.exceptions.TimeoutError as e:
+            duration = time.monotonic() - start_time
+            self._record_timeout_error(duration, e)
             raise
 
         except Exception as e:
             # Track other errors
-            duration = time.time() - start_time
-            error_type = type(e).__name__
-            celery_publish_failed.labels(
-                worker=WORKER_NAME, error_type=error_type
-            ).inc()
-
-            print(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
+            duration = time.monotonic() - start_time
+            self._record_error(duration, e)
             raise
+
         finally:
             # Done with publish attempt
             publish_queue_depth.labels(worker=WORKER_NAME).dec()
             concurrent_publishes.labels(worker=WORKER_NAME).dec()
+
+    def _record_timeout_error(self, duration: float, error: Exception):
+        """Record timeout error metrics"""
+        celery_publish_failed.labels(
+            worker=WORKER_NAME, error_type="TimeoutError"
+        ).inc()
+        print(f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH TIMEOUT after {duration:.3f}s: {error}")
+
+    def _record_connection_error(self, duration, error):
+        celery_publish_connection_errors.labels(worker=WORKER_NAME).inc()
+        celery_publish_failed.labels(
+            worker=WORKER_NAME, error_type="ConnectionError"
+        ).inc()
+        print(
+            f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH FAILED: ConnectionError after {duration:.3f}s"
+        )
+        print(f"           Cannot get Redis connection: {error}")
+
+    def _record_publish_success(self, duration):
+        """Record successful publish metrics"""
+        celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
+        celery_publish_total.labels(worker=WORKER_NAME).inc()
+
+    def _record_error(self, duration: float, error: Exception):
+        error_type = type(error).__name__
+        celery_publish_failed.labels(worker=WORKER_NAME, error_type=error_type).inc()
+
+        print(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
+
+    def _log_duration(self, duration: float):
+        """Log publish duration with severity indicators"""
+        if duration > self.CRITICAL_THRESHOLD:
+            print(
+                f"🔴🔴🔴 [{WORKER_NAME}] CRITICAL POOL WAIT: {duration:.3f}s - BROKER POOL SATURATED!"
+            )
+        elif duration > self.SEVERE_THRESHOLD:
+            print(f"🔴 [{WORKER_NAME}] Severe pool contention: {duration:.3f}s")
+        elif duration > self.WARNING_THRESHOLD:
+            print(f"🟡 [{WORKER_NAME}] Pool pressure: {duration:.3f}s")
+        elif duration > self.SLOW_THRESHOLD:
+            print(f"⚠️  [{WORKER_NAME}] Slow publish: {duration:.3f}s")
