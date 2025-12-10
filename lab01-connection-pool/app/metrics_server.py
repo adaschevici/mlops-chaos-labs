@@ -1,6 +1,5 @@
 import os
 import sys
-from pathlib import Path
 
 from prometheus_client import CollectorRegistry, multiprocess, generate_latest
 from prometheus_client.exposition import CONTENT_TYPE_LATEST
@@ -8,6 +7,7 @@ from fastapi import FastAPI, Response, HTTPException
 import structlog
 import logging
 import uvicorn
+from common import get_multiproc_dir
 
 # Configure once at module level
 structlog.configure(
@@ -35,9 +35,7 @@ logger = structlog.get_logger()
 
 # --- Configuration ---
 # Get the directory from environment variable, fall back to default
-PROMETHEUS_MULTIPROC_DIR = os.environ.get(
-    "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc"
-)
+PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
 HOST = "0.0.0.0"
 PORT = 9080
 # ---------------------
@@ -63,21 +61,15 @@ def collect_multiprocess_metrics(path: str) -> bytes:
         return generate_latest(registry)
     except Exception as e:
         # Log the error and return a 500 status
-        print(f"Error during metric aggregation: {e}", file=sys.stderr)
+        logger.info(f"Error during metric aggregation: {e}", file=sys.stderr)
         return b""
-
-
-PROMETHEUS_MULTIPROC_DIR = Path(
-    os.environ.get("PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc")
-)
 
 
 @app.get("/metrics")
 async def metrics():
     try:
-        registry = CollectorRegistry()
-        multiprocess.MultiProcessCollector(registry)
-        return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
+        latest = collect_multiprocess_metrics(PROMETHEUS_MULTIPROC_DIR)
+        return Response(latest, media_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error(
             "metric_aggregation_failed", error=str(e), error_type=type(e).__name__
@@ -124,16 +116,16 @@ def health() -> dict:
 
 
 if __name__ == "__main__":
-    print("🚀 Starting Prometheus metrics exporter (FastAPI/Uvicorn)")
-    print(f"📂 Metrics directory: {PROMETHEUS_MULTIPROC_DIR}")
-    print(f"🌐 Serving metrics at http://{HOST}:{PORT}/metrics")
-    print(f"💚 Serving health check at http://{HOST}:{PORT}/healthz")
+    logger.info("🚀 Starting Prometheus metrics exporter (FastAPI/Uvicorn)")
+    logger.info(f"📂 Metrics directory: {PROMETHEUS_MULTIPROC_DIR}")
+    logger.info(f"🌐 Serving metrics at http://{HOST}:{PORT}/metrics")
+    logger.info(f"💚 Serving health check at http://{HOST}:{PORT}/healthz")
 
     # Make sure directory exists before starting
     try:
         os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
     except OSError as e:
-        print(
+        logger.info(
             f"FATAL ERROR: Could not create directory {PROMETHEUS_MULTIPROC_DIR}. Check permissions. Error: {e}",
             file=sys.stderr,
         )
