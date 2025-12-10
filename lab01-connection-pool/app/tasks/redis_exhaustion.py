@@ -13,7 +13,6 @@ from threading import Lock
 from celery_app import app, WORKER_NAME
 from tasks.common import get_redis
 from tasks.metrics import tasks_in_progress, task_counter, task_duration
-from instrumented_task import InstrumentedTask
 
 
 # Queue and broker metrics
@@ -186,7 +185,7 @@ concurrent_publishes_lock = Lock()
 #         gevent.sleep(5)
 
 
-@app.task(bind=True, base=InstrumentedTask)
+@app.task(bind=True)
 def task_with_extra_connections(self, task_id, operations=10):
     """
     This task opens additional Redis connections

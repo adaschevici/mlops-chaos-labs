@@ -8,7 +8,6 @@ import time
 import random
 from prometheus_client import Histogram
 from celery_app import app, WORKER_NAME
-from instrumented_task import InstrumentedTask
 from tasks.common import get_redis
 from tasks.metrics import tasks_in_progress, task_counter, task_duration
 
@@ -21,7 +20,7 @@ celery_result_get_duration = Histogram(
 )
 
 
-@app.task(bind=True, base=InstrumentedTask)
+@app.task(bind=True)
 def task_with_broker_pool_contention(self, task_id, subtasks=50):
     """Task that spawns subtasks, stressing Celery's broker pool"""
     print(f"📤 Task {task_id} spawning {subtasks} subtasks - will exhaust broker pool")

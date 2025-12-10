@@ -17,7 +17,8 @@ worker_max_tasks_per_child = None  # Never restart
 result_expires = None  # Results never expire (memory pressure)
 task_track_started = True  # Extra Redis writes
 
-# imports = (
-#     "tasks.redis_exhaustion",
-#     "tasks.broker_pool_contention",  # if you have this
-# )
+task_cls = "instrumented_task.InstrumentedTask"  # Use our custom task class
+
+broker_transport_options = {
+    "visibility_timeout": 3600,  # 1 hour visibility timeout
+}
