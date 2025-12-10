@@ -303,260 +303,293 @@ def create_connection_exhaustion_dashboard():
                     }
                 },
             },
-            # # Panel 8: Success Rate %
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 9,
-            #     "title": "Task Success Rate",
-            #     "type": "timeseries",
-            #     "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(rate(celery_task_total{status='success'}[1m])) / sum(rate(celery_task_total[1m])) * 100",
-            #             "legendFormat": "Success Rate %",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "unit": "percent",
-            #             "min": 0,
-            #             "max": 100,
-            #             "custom": {
-            #                 "axisLabel": "Success %",
-            #                 "fillOpacity": 20,
-            #                 "lineWidth": 2,
-            #             },
-            #             "thresholds": {
-            #                 "mode": "absolute",
-            #                 "steps": [
-            #                     {"color": "red", "value": None},
-            #                     {"color": "yellow", "value": 80},
-            #                     {"color": "green", "value": 95},
-            #                 ],
-            #             },
-            #         }
-            #     },
-            # },
-            # # Panel 9: THE KEY CORRELATION - Connections vs Task Throughput
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 10,
-            #     "title": "🔍 CRITICAL: Connection Usage vs Task Throughput",
-            #     "type": "timeseries",
-            #     "gridPos": {"h": 10, "w": 24, "x": 0, "y": 25},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "redis_connected_clients / redis_config_maxclients * 100",
-            #             "legendFormat": "Connection Usage %",
-            #             "refId": "A",
-            #         },
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(rate(celery_task_total[30s])) * 5",
-            #             "legendFormat": "Task Throughput (scaled 5x for visibility)",
-            #             "refId": "B",
-            #         },
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "palette-classic"},
-            #             "custom": {
-            #                 "fillOpacity": 15,
-            #                 "lineWidth": 3,
-            #                 "drawStyle": "line",
-            #                 "lineInterpolation": "smooth",
-            #             },
-            #         },
-            #         "overrides": [
-            #             {
-            #                 "matcher": {
-            #                     "id": "byName",
-            #                     "options": "Task Throughput (scaled 5x for visibility)",
-            #                 },
-            #                 "properties": [
-            #                     {"id": "custom.axisPlacement", "value": "right"},
-            #                     {
-            #                         "id": "color",
-            #                         "value": {"fixedColor": "blue", "mode": "fixed"},
-            #                     },
-            #                 ],
-            #             },
-            #             {
-            #                 "matcher": {
-            #                     "id": "byName",
-            #                     "options": "Connection Usage %",
-            #                 },
-            #                 "properties": [
-            #                     {
-            #                         "id": "color",
-            #                         "value": {"fixedColor": "orange", "mode": "fixed"},
-            #                     }
-            #                 ],
-            #             },
-            #         ],
-            #     },
-            #     "options": {
-            #         "legend": {
-            #             "displayMode": "table",
-            #             "placement": "bottom",
-            #             "showLegend": True,
-            #             "calcs": ["mean", "max", "lastNotNull"],
-            #         }
-            #     },
-            # },
-            # # Better approach: Summary stats as stat panels in a row
-            # {
-            #     "type": "row",
-            #     "id": 11,
-            #     "title": "📊 Summary Statistics",
-            #     "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
-            #     "collapsed": False,
-            # },
-            # # Total Tasks
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 12,
-            #     "title": "Total Tasks",
-            #     "type": "stat",
-            #     "gridPos": {"h": 4, "w": 5, "x": 0, "y": 36},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(celery_task_total)",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {"steps": [{"color": "blue", "value": None}]},
-            #             "decimals": 0,
-            #         }
-            #     },
-            #     "options": {
-            #         "colorMode": "background",
-            #         "graphMode": "none",
-            #         "textMode": "value_and_name",
-            #     },
-            # },
-            # # Successful Tasks
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 13,
-            #     "title": "Successful Tasks",
-            #     "type": "stat",
-            #     "gridPos": {"h": 4, "w": 5, "x": 5, "y": 36},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(celery_task_total{status='success'})",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {"steps": [{"color": "green", "value": None}]},
-            #             "decimals": 0,
-            #         }
-            #     },
-            #     "options": {
-            #         "colorMode": "background",
-            #         "graphMode": "none",
-            #         "textMode": "value_and_name",
-            #     },
-            # },
-            # # Failed Tasks
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 14,
-            #     "title": "Failed Tasks",
-            #     "type": "stat",
-            #     "gridPos": {"h": 4, "w": 5, "x": 10, "y": 36},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(celery_task_total{status='failure'})",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {"steps": [{"color": "red", "value": None}]},
-            #             "decimals": 0,
-            #         }
-            #     },
-            #     "options": {
-            #         "colorMode": "background",
-            #         "graphMode": "none",
-            #         "textMode": "value_and_name",
-            #     },
-            # },
-            # # Average Rate
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 15,
-            #     "title": "Avg Rate (tasks/min)",
-            #     "type": "stat",
-            #     "gridPos": {"h": 4, "w": 5, "x": 15, "y": 36},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "sum(rate(celery_task_total[5m])) * 60",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {"steps": [{"color": "yellow", "value": None}]},
-            #             "decimals": 2,
-            #             "unit": "cpm",
-            #         }
-            #     },
-            #     "options": {
-            #         "colorMode": "background",
-            #         "graphMode": "area",
-            #         "textMode": "value_and_name",
-            #     },
-            # },
-            # # Current Connections
-            # {
-            #     "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #     "id": 16,
-            #     "title": "Redis Connections",
-            #     "type": "stat",
-            #     "gridPos": {"h": 4, "w": 4, "x": 20, "y": 36},
-            #     "targets": [
-            #         {
-            #             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            #             "expr": "redis_connected_clients",
-            #             "refId": "A",
-            #         }
-            #     ],
-            #     "fieldConfig": {
-            #         "defaults": {
-            #             "color": {"mode": "thresholds"},
-            #             "thresholds": {
-            #                 "steps": [
-            #                     {"color": "green", "value": None},
-            #                     {"color": "yellow", "value": 50},
-            #                     {"color": "red", "value": 90},
-            #                 ]
-            #             },
-            #             "decimals": 0,
-            #         }
-            #     },
-            #     "options": {
-            #         "colorMode": "background",
-            #         "graphMode": "area",
-            #         "textMode": "value_and_name",
-            #     },
-            # },
+            # Panel 8: Success Rate %
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 9,
+                "title": "Task Success Rate",
+                "type": "timeseries",
+                "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(rate(celery_task_total{status='success'}[1m])) / sum(rate(celery_task_total[1m])) * 100",
+                        "legendFormat": "Success Rate %",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "percent",
+                        "min": 0,
+                        "max": 100,
+                        "custom": {
+                            "axisLabel": "Success %",
+                            "fillOpacity": 20,
+                            "lineWidth": 2,
+                        },
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {"color": "red", "value": None},
+                                {"color": "yellow", "value": 80},
+                                {"color": "green", "value": 95},
+                            ],
+                        },
+                    }
+                },
+            },
+            # Panel 9: THE KEY CORRELATION - Connections vs Task Throughput
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 10,
+                "title": "🔍 CRITICAL: Connection Usage vs Task Throughput",
+                "type": "timeseries",
+                "gridPos": {"h": 10, "w": 24, "x": 0, "y": 25},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "redis_connected_clients / redis_config_maxclients * 100",
+                        "legendFormat": "Connection Usage %",
+                        "refId": "A",
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(rate(celery_task_total[30s])) * 5",
+                        "legendFormat": "Task Throughput (scaled 5x for visibility)",
+                        "refId": "B",
+                    },
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "palette-classic"},
+                        "custom": {
+                            "fillOpacity": 15,
+                            "lineWidth": 3,
+                            "drawStyle": "line",
+                            "lineInterpolation": "smooth",
+                        },
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Task Throughput (scaled 5x for visibility)",
+                            },
+                            "properties": [
+                                {"id": "custom.axisPlacement", "value": "right"},
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "blue", "mode": "fixed"},
+                                },
+                            ],
+                        },
+                        {
+                            "matcher": {
+                                "id": "byName",
+                                "options": "Connection Usage %",
+                            },
+                            "properties": [
+                                {
+                                    "id": "color",
+                                    "value": {"fixedColor": "orange", "mode": "fixed"},
+                                }
+                            ],
+                        },
+                    ],
+                },
+                "options": {
+                    "legend": {
+                        "displayMode": "table",
+                        "placement": "bottom",
+                        "showLegend": True,
+                        "calcs": ["mean", "max", "lastNotNull"],
+                    }
+                },
+            },
+            # Better approach: Summary stats as stat panels in a row
+            {
+                "type": "row",
+                "id": 11,
+                "title": "📊 Summary Statistics",
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
+                "collapsed": False,
+            },
+            # Total Tasks
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 12,
+                "title": "Total Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 0, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_task_total)",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "blue", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Successful Tasks
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 13,
+                "title": "Successful Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 4, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_task_total{status='success'})",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "green", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Failed Tasks
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 14,
+                "title": "Failed Tasks",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 8, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_task_total{status='failure'})",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "red", "value": None}]},
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Average Rate
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 15,
+                "title": "Avg Rate (tasks/min)",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 12, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(rate(celery_task_total[5m])) * 60",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {"steps": [{"color": "yellow", "value": None}]},
+                        "decimals": 2,
+                        "unit": "cpm",
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Current Connections
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 16,
+                "title": "Redis Connections",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 16, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "redis_connected_clients",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": None},
+                                {"color": "yellow", "value": 50},
+                                {"color": "red", "value": 90},
+                            ]
+                        },
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                },
+            },
+            # Unaccounted (Published - Completed - InProgress - Queued = Lost/Stuck)
+            {
+                "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "id": 17,
+                "title": "Lost/Unaccounted",
+                "type": "stat",
+                "gridPos": {"h": 4, "w": 4, "x": 20, "y": 36},
+                "targets": [
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_publish_total) - sum(celery_task_total) - sum(celery_tasks_in_progress) - max(celery_task_queue_depth{queue_name='celery'})",
+                        "refId": "A",
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {"mode": "thresholds"},
+                        "thresholds": {
+                            "steps": [
+                                {"color": "green", "value": None},
+                                {"color": "yellow", "value": 10},
+                                {"color": "red", "value": 100},
+                            ]
+                        },
+                        "decimals": 0,
+                    }
+                },
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "textMode": "value_and_name",
+                },
+            },
             # # ============================================================
             # # SCENARIO 2: CELERY BROKER POOL CONTENTION
             # # ============================================================

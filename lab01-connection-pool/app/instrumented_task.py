@@ -8,7 +8,16 @@ import redis
 from celery import Task
 from prometheus_client import Histogram, Counter, Gauge
 from celery_app import WORKER_NAME
+from commmon import configure_logging
 
+import structlog
+
+# 1. Call the configuration function FIRST
+configure_logging()
+
+# 2. Get the main application logger
+# Use the module's __name__ for a properly named stdlib logger
+logger = structlog.get_logger(__name__)
 
 celery_publish_total = Counter("celery_publish", "Total tasks published", ["worker"])
 
@@ -115,38 +124,41 @@ class InstrumentedTask(Task):
         celery_publish_failed.labels(
             worker=WORKER_NAME, error_type="TimeoutError"
         ).inc()
-        print(f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH TIMEOUT after {duration:.3f}s: {error}")
+        logger.error(
+            f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH TIMEOUT after {duration:.3f}s: {error}"
+        )
 
     def _record_connection_error(self, duration, error):
         celery_publish_connection_errors.labels(worker=WORKER_NAME).inc()
         celery_publish_failed.labels(
             worker=WORKER_NAME, error_type="ConnectionError"
         ).inc()
-        print(
+        logger.info(
             f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH FAILED: ConnectionError after {duration:.3f}s"
         )
-        print(f"           Cannot get Redis connection: {error}")
+        logger.error(f"           Cannot get Redis connection: {error}")
 
     def _record_publish_success(self, duration):
         """Record successful publish metrics"""
         celery_publish_duration.labels(worker=WORKER_NAME).observe(duration)
         celery_publish_total.labels(worker=WORKER_NAME).inc()
+        self._log_duration(duration)
 
     def _record_error(self, duration: float, error: Exception):
         error_type = type(error).__name__
         celery_publish_failed.labels(worker=WORKER_NAME, error_type=error_type).inc()
 
-        print(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
+        logger.error(f"🔴 PUBLISH FAILED: {error_type} after {duration:.3f}s")
 
     def _log_duration(self, duration: float):
         """Log publish duration with severity indicators"""
         if duration > self.CRITICAL_THRESHOLD:
-            print(
+            logger.info(
                 f"🔴🔴🔴 [{WORKER_NAME}] CRITICAL POOL WAIT: {duration:.3f}s - BROKER POOL SATURATED!"
             )
         elif duration > self.SEVERE_THRESHOLD:
-            print(f"🔴 [{WORKER_NAME}] Severe pool contention: {duration:.3f}s")
+            logger.info(f"🔴 [{WORKER_NAME}] Severe pool contention: {duration:.3f}s")
         elif duration > self.WARNING_THRESHOLD:
-            print(f"🟡 [{WORKER_NAME}] Pool pressure: {duration:.3f}s")
+            logger.info(f"🟡 [{WORKER_NAME}] Pool pressure: {duration:.3f}s")
         elif duration > self.SLOW_THRESHOLD:
-            print(f"⚠️  [{WORKER_NAME}] Slow publish: {duration:.3f}s")
+            logger.info(f"⚠️  [{WORKER_NAME}] Slow publish: {duration:.3f}s")

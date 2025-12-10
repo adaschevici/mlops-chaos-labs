@@ -73,10 +73,6 @@ celery_broker_pool_saturation = Gauge(
 )
 
 
-# Track publish timing
-publish_times = {}
-publish_lock = Lock()
-
 # FIXED: Manual counter for tracking concurrent publishes
 concurrent_publishes_count = 0
 concurrent_publishes_lock = Lock()

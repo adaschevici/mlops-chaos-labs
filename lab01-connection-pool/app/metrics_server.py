@@ -4,31 +4,17 @@ import sys
 from prometheus_client import CollectorRegistry, multiprocess, generate_latest
 from prometheus_client.exposition import CONTENT_TYPE_LATEST
 from fastapi import FastAPI, Response, HTTPException
-import structlog
-import logging
+
 import uvicorn
-from common import get_multiproc_dir
+from common import get_multiproc_dir, configure_logging
+import structlog
 
-# Configure once at module level
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer(),
-    ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    cache_logger_on_first_use=True,
-)
+# 1. Call the configuration function FIRST
+configure_logging()
 
-# Set log level
-logging.basicConfig(level=logging.INFO)
-
-logger = structlog.get_logger()
+# 2. Get the main application logger
+# Use the module's __name__ for a properly named stdlib logger
+logger = structlog.get_logger(__name__)
 # ----------------------------------------------------------------------
 # Prometheus FastAPI Metrics Exporter for Multiprocess Celery Workers
 # ----------------------------------------------------------------------

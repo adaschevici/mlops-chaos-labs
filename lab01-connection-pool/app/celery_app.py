@@ -5,30 +5,36 @@ monkey.patch_all()
 
 from celery import Celery, bootsteps
 
-# from celery.signals import (
-#     before_task_publish,
-#     after_task_publish,
-# )
 import os
 import socket
+from threading import Lock
+
+from commmon import configure_logging, get_multiproc_dir
+
+import structlog
+
+# 1. Call the configuration function FIRST
+configure_logging()
+
+# 2. Get the main application logger
+# Use the module's __name__ for a properly named stdlib logger
+logger = structlog.get_logger(__name__)
 
 
-PROMETHEUS_MULTIPROC_DIR = os.environ.get(
-    "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus-multiproc"
-)
+PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
+
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())
 
+# Track publish timing
+publish_times = {}
+publish_lock = Lock()
 
 app = Celery("chaos_lab")
 app.config_from_object("celeryconfig_redis")
 app.autodiscover_tasks(
     ["tasks.redis_exhaustion", "tasks.broker_pool_contention"], force=True
 )
-# app.autodiscover_tasks(
-#     ["tasks.broker_pool_contention", "tasks.redis_exhaustion"], force=True
-# )
-
 # class MonitoringBootstep(bootsteps.StartStopStep):
 #     """Start monitoring greenlets for gevent pool workers."""
 #
@@ -70,6 +76,7 @@ app.autodiscover_tasks(
 #         print(f"🧹 Worker {os.getpid()} monitoring stopped")
 #
 
+
 # Register AFTER app is created
 # app.steps["worker"].add(MonitoringBootstep)
 #
@@ -78,23 +85,27 @@ app.autodiscover_tasks(
 #     """Track when task publishing starts"""
 #     task_id = headers.get("id") if headers else None
 #     if task_id:
-#         with concurrent_publishes_lock:
-#             global concurrent_publishes_count
-#             concurrent_publishes_count += 1
+#         # with concurrent_publishes_lock:
+#         #     global concurrent_publishes_count
+#         #     concurrent_publishes_count += 1
 #         with publish_lock:
 #             publish_times[task_id] = time.time()
 #
+
 #
+#
+# #
+# #
 # @after_task_publish.connect
 # def track_publish_end(sender=None, headers=None, body=None, **kwargs):
 #     """Track when task publishing completes - measure pool wait time"""
 #     task_id = headers.get("id") if headers else None
 #     if task_id:
 #         end_time = time.time()
-#         with concurrent_publishes_lock:
-#             global concurrent_publishes_count
-#             # Ensure the count doesn't go below zero due to potential edge cases
-#             concurrent_publishes_count = max(0, concurrent_publishes_count - 1)
+#         # with concurrent_publishes_lock:
+#         #     global concurrent_publishes_count
+#         #     # Ensure the count doesn't go below zero due to potential edge cases
+#         #     concurrent_publishes_count = max(0, concurrent_publishes_count - 1)
 #         with publish_lock:
 #             start_time = publish_times.pop(task_id, None)
 #
@@ -118,4 +129,7 @@ app.autodiscover_tasks(
 #                     print(f"🟡 WARNING: Publish took {duration:.3f}s (pool pressure)")
 #                 elif duration > 0.1:
 #                     print(f"⚠️  Slow publish: {duration:.3f}s")
-# Autodiscover tasks in these modules
+
+
+#
+# # Autodiscover tasks in these modules
