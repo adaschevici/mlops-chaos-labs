@@ -698,6 +698,15 @@
           },
           "expr": "sum(celery_task_total{status='success'})",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(celery_task_total{status='success'}) / sum(celery_task_total) * 100",
+          "refId": "B",
+          "legendFormat": "percentage"
         }
       ],
       "fieldConfig": {
@@ -714,7 +723,25 @@
             ]
           },
           "decimals": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "percentage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "colorMode": "background",
@@ -744,6 +771,15 @@
           },
           "expr": "sum(celery_task_total{status='failure'})",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(celery_task_total{status='failure'}) / sum(celery_task_total) * 100",
+          "refId": "B",
+          "legendFormat": "percentage"
         }
       ],
       "fieldConfig": {
@@ -760,7 +796,25 @@
             ]
           },
           "decimals": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "percentage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "colorMode": "background",
@@ -790,6 +844,15 @@
           },
           "expr": "sum(rate(celery_task_total[5m])) * 60",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "redis_connected_clients / redis_config_maxclients * 100",
+          "refId": "B",
+          "legendFormat": "% of max"
         }
       ],
       "fieldConfig": {
@@ -807,7 +870,25 @@
           },
           "decimals": 2,
           "unit": "cpm"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of max"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "colorMode": "background",
@@ -891,6 +972,15 @@
           },
           "expr": "sum(celery_publish_total) - sum(celery_task_total) - sum(celery_tasks_in_progress) - max(celery_task_queue_depth{queue_name='celery'})",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(celery_publish_total) - sum(celery_task_total) - sum(celery_tasks_in_progress) - max(celery_task_queue_depth{queue_name='celery'})) / sum(celery_publish_total) * 100",
+          "refId": "B",
+          "legendFormat": "% lost"
         }
       ],
       "fieldConfig": {
@@ -915,7 +1005,25 @@
             ]
           },
           "decimals": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% lost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "colorMode": "background",
