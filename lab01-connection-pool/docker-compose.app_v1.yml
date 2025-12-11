@@ -10,12 +10,13 @@ services:
     labels:
       - __meta_docker_container_label_com_docker_compose_service
     environment:
-      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-multiproc
+      # - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-multiproc/${HOSTNAME}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - ./app:/app
       - prometheus-multiproc:/tmp/prometheus-multiproc:rw
+    entrypoint: ["/app/entrypoint.sh"]
     command: celery -A celery_app worker --loglevel=info --pool=gevent --concurrency=400
     networks:
       - lab01-network

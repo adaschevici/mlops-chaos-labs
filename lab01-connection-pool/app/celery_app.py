@@ -9,7 +9,7 @@ import os
 import socket
 from threading import Lock
 
-from commmon import configure_logging, get_multiproc_dir
+from common import configure_logging, METRICS_DIR
 
 import structlog
 
@@ -21,7 +21,7 @@ configure_logging()
 logger = structlog.get_logger(__name__)
 
 
-PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
+PROMETHEUS_MULTIPROC_DIR = METRICS_DIR
 
 # Get worker name from environment or hostname
 WORKER_NAME = os.getenv("WORKER_NAME", socket.gethostname())

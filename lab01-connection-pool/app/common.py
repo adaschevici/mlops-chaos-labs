@@ -59,26 +59,29 @@ def configure_logging():
     )
 
 
+# 1. Call the configuration function FIRST
+configure_logging()
+
+# 2. Get the main application logger
+# Use the module's __name__ for a properly named stdlib logger
+logger = structlog.get_logger(__name__)
+
+
 def get_multiproc_dir() -> Path:
-    """Get or create multiprocess metrics directory"""
+    """Initialize on module import"""
+    metrics_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
 
-    # 1. Get the directory path from environment variable or use the default
-    # os.environ.get is the standard way to retrieve env vars.
-    metrics_dir_str = os.environ.get(
-        "PROMETHEUS_MULTIPROC_DIR", "/tmp/prometheus_multiproc"
-    )
+    if not metrics_dir:
+        hostname = os.environ.get("HOSTNAME", "unknown")
+        metrics_dir = f"/tmp/prometheus-multiproc/{hostname}"
+        os.environ["PROMETHEUS_MULTIPROC_DIR"] = metrics_dir
 
-    # 2. Convert the string path to a Path object
-    metrics_dir = Path(metrics_dir_str)
-
-    # 3. Check if the directory exists and create it if it doesn't
-    # Path.mkdir() with parents=True and exist_ok=True is the
-    # equivalent of os.makedirs(..., exist_ok=True)
-    metrics_dir.mkdir(parents=True, exist_ok=True)
-
-    # 4. Return the Path object
+    Path(metrics_dir).mkdir(parents=True, exist_ok=True)
+    logger.info(f"[metrics] Dir: {metrics_dir}")
     return metrics_dir
 
+
+METRICS_DIR = get_multiproc_dir()
 
 # Call this function once when your application starts
 if __name__ != "__main__":

@@ -8,7 +8,7 @@ import redis
 from celery import Task
 from prometheus_client import Histogram, Counter, Gauge
 from celery_app import WORKER_NAME
-from commmon import configure_logging
+from common import configure_logging
 
 import structlog
 

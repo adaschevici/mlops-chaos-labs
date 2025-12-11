@@ -115,7 +115,7 @@ def task_with_broker_pool_contention(self, task_id, subtasks=50):
         tasks_in_progress.labels(task_name=task_name, worker=WORKER_NAME).dec()
 
 
-@app.task(bind=True, base=InstrumentedTask)
+@app.task(bind=True)
 def worker_task(self, parent_id, step_id):
     """
     Simple worker task that does minimal work.
