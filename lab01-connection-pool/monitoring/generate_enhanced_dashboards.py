@@ -427,14 +427,29 @@ def create_connection_exhaustion_dashboard():
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
                         "expr": "sum(celery_task_total)",
                         "refId": "A",
-                    }
+                    },
+                    {
+                        "datasource": {"type": "prometheus", "uid": "prometheus"},
+                        "expr": "sum(celery_task_total) / sum(celery_publish_total) * 100",
+                        "refId": "B",
+                        "legendFormat": "percentage",
+                    },
                 ],
                 "fieldConfig": {
                     "defaults": {
                         "color": {"mode": "thresholds"},
                         "thresholds": {"steps": [{"color": "blue", "value": None}]},
                         "decimals": 0,
-                    }
+                    },
+                    "overrides": [
+                        {
+                            "matcher": {"id": "byName", "options": "percentage"},
+                            "properties": [
+                                {"id": "unit", "value": "percent"},
+                                {"id": "decimals", "value": 2},
+                            ],
+                        }
+                    ],
                 },
                 "options": {
                     "colorMode": "background",
@@ -539,12 +554,6 @@ def create_connection_exhaustion_dashboard():
                         "expr": "sum(rate(celery_task_total[5m])) * 60",
                         "refId": "A",
                     },
-                    {
-                        "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "redis_connected_clients / redis_config_maxclients * 100",
-                        "refId": "B",
-                        "legendFormat": "% of max",
-                    },
                 ],
                 "fieldConfig": {
                     "defaults": {
@@ -552,16 +561,7 @@ def create_connection_exhaustion_dashboard():
                         "thresholds": {"steps": [{"color": "yellow", "value": None}]},
                         "decimals": 2,
                         "unit": "cpm",
-                    },
-                    "overrides": [
-                        {
-                            "matcher": {"id": "byName", "options": "% of max"},
-                            "properties": [
-                                {"id": "unit", "value": "percent"},
-                                {"id": "decimals", "value": 1},
-                            ],
-                        }
-                    ],
+                    }
                 },
                 "options": {
                     "colorMode": "background",
@@ -612,12 +612,12 @@ def create_connection_exhaustion_dashboard():
                 "targets": [
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "sum(celery_publish_total) - sum(celery_task_total) - sum(celery_tasks_in_progress) - max(celery_task_queue_depth{queue_name='celery'})",
+                        "expr": "(sum(celery_publish_total) or vector(0)) - (sum(celery_task_total) or vector(0)) - (sum(celery_tasks_in_progress) or vector(0)) - (max(celery_task_queue_depth{queue_name='celery'}) or vector(0))",
                         "refId": "A",
                     },
                     {
                         "datasource": {"type": "prometheus", "uid": "prometheus"},
-                        "expr": "(sum(celery_publish_total) - sum(celery_task_total) - sum(celery_tasks_in_progress) - max(celery_task_queue_depth{queue_name='celery'})) / sum(celery_publish_total) * 100",
+                        "expr": "((sum(celery_publish_total) or vector(0)) - (sum(celery_task_total) or vector(0)) - (sum(celery_tasks_in_progress) or vector(0)) - (max(celery_task_queue_depth{queue_name='celery'}) or vector(0))) / (sum(celery_publish_total) or vector(1)) * 100",
                         "refId": "B",
                         "legendFormat": "% lost",
                     },

@@ -1,5 +1,10 @@
+# ruff: noqa: E402
 from collections import deque
 from click import echo, command, argument, Choice
+from common import get_multiproc_dir
+
+PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
+
 from tasks.redis_exhaustion import (
     task_with_extra_connections,
 )

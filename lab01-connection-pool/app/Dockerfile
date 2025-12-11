@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     iproute2 \
     net-tools \
+    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (better caching)

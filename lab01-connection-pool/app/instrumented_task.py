@@ -8,10 +8,11 @@ import redis
 from celery import Task
 from prometheus_client import Histogram, Counter, Gauge
 from celery_app import WORKER_NAME
-from common import configure_logging
+from common import configure_logging, get_multiproc_dir
 
 import structlog
 
+PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
 # 1. Call the configuration function FIRST
 configure_logging()
 
@@ -133,7 +134,7 @@ class InstrumentedTask(Task):
         celery_publish_failed.labels(
             worker=WORKER_NAME, error_type="ConnectionError"
         ).inc()
-        logger.info(
+        logger.error(
             f"🔴🔴🔴 [{WORKER_NAME}] PUBLISH FAILED: ConnectionError after {duration:.3f}s"
         )
         logger.error(f"           Cannot get Redis connection: {error}")
@@ -162,3 +163,6 @@ class InstrumentedTask(Task):
             logger.info(f"🟡 [{WORKER_NAME}] Pool pressure: {duration:.3f}s")
         elif duration > self.SLOW_THRESHOLD:
             logger.info(f"⚠️  [{WORKER_NAME}] Slow publish: {duration:.3f}s")
+        else:
+            # Log all publishes at debug level
+            logger.debug(f"✅ [{WORKER_NAME}] Publish OK: {duration:.3f}s")

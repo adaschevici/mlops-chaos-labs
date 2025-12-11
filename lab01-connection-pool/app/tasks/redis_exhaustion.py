@@ -8,6 +8,7 @@ import random
 import redis
 import json
 from prometheus_client import Counter, Gauge
+from instrumented_task import InstrumentedTask
 import gevent
 from threading import Lock
 from celery_app import app, WORKER_NAME
@@ -185,14 +186,12 @@ concurrent_publishes_lock = Lock()
 #         gevent.sleep(5)
 
 
-@app.task(bind=True)
+@app.task(bind=True, base=InstrumentedTask)
 def task_with_extra_connections(self, task_id, operations=10):
     """
     This task opens additional Redis connections
     beyond what Celery manages - THIS is what breaks it
     """
-    print(f"Task {task_id} starting - will open {operations} connections")
-
     task_name = "task_with_extra_connections"
 
     # Track task start

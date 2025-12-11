@@ -1,3 +1,8 @@
+# ruff: noqa: E402
+from common import get_multiproc_dir
+
+PROMETHEUS_MULTIPROC_DIR = get_multiproc_dir()
+
 from prometheus_client import Gauge, Counter, Histogram
 
 tasks_in_progress = Gauge(

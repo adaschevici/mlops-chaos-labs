@@ -81,8 +81,6 @@ def get_multiproc_dir() -> Path:
     return metrics_dir
 
 
-METRICS_DIR = get_multiproc_dir()
-
 # Call this function once when your application starts
 if __name__ != "__main__":
     # Typically, you call this in your main application entry point
